@@ -33,6 +33,8 @@
 #include "lima/Exceptions.h"
 #include "SlsJungfrauCamera.h"
 
+#include <slsDetectorUsers.h>
+
 using namespace lima;
 using namespace lima::SlsJungfrau;
 
@@ -42,15 +44,9 @@ using namespace lima::SlsJungfrau;
  * \brief constructor
  * @param in_config_file_name complete path to the configuration file
  ************************************************************************/
-Camera::Camera(const std::string & in_config_file_name): m_thread(*this)
+Camera::Camera(): m_thread(*this)
 {
     DEB_CONSTRUCTOR();
-    
-    // inits the class attributes
-    m_config_file_name = in_config_file_name;
-
-    // starting the acquisition thread
-    m_thread.start();
 }
 
 /************************************************************************
@@ -59,6 +55,36 @@ Camera::Camera(const std::string & in_config_file_name): m_thread(*this)
 Camera::~Camera()
 {
     DEB_DESTRUCTOR();
+}
+
+/************************************************************************
+ * \brief inits the camera while setting the configuration file name
+ * @param in_config_file_name complete path to the configuration file
+ ************************************************************************/
+void Camera::init(const std::string & in_config_file_name)
+{
+    DEB_MEMBER_FUNCT();
+    
+    // inits the class attributes
+    m_config_file_name = in_config_file_name;
+
+    // create the detector control instance
+    int id = 0;
+
+    m_detector_control.reset(new slsDetectorUsers(id));
+
+    // configuration file is used to properly configure advanced settings in the shared memory
+    m_detector_control->readConfigurationFile(m_config_file_name);
+
+    // Setting the detector online
+    m_detector_control->setOnline(1);
+
+    // starting the acquisition thread
+    m_thread.start();
+
+    std::cout << "Module   Firmware Version : " << getModuleFirmwareVersion  () << std::endl;
+    std::cout << "Detector Firmware Version : " << getDetectorFirmwareVersion() << std::endl;
+    std::cout << "Detector Software Version : " << getDetectorSoftwareVersion() << std::endl;
 }
 
 //==================================================================
@@ -249,9 +275,50 @@ std::string Camera::getDetectorType() const
 std::string Camera::getDetectorModel() const
 {
     DEB_MEMBER_FUNCT();
-    std::string model = "To defined";
+    std::string model = "To be defined";
     DEB_RETURN() << model;
     return model;
+}
+
+/*******************************************************************
+ * \brief converts a version id to a string
+ * \return version in string format
+ *******************************************************************/
+std::string Camera::convertVersionToString(int64_t in_version)
+{
+    std::stringstream tempStream;
+    tempStream << in_version;
+    return tempStream.str();
+}
+
+/*******************************************************************
+ * \brief gets Module Firmware Version
+ * \return Module Firmware Version
+ *******************************************************************/
+std::string Camera::getModuleFirmwareVersion() const
+{
+    DEB_MEMBER_FUNCT();
+    return convertVersionToString(m_detector_control->getModuleFirmwareVersion());
+}
+
+/*******************************************************************
+ * \brief gets Detector Firmware Version
+ * \return Detector Firmware Version
+ *******************************************************************/
+std::string Camera::getDetectorFirmwareVersion() const
+{
+    DEB_MEMBER_FUNCT();
+    return convertVersionToString(m_detector_control->getDetectorFirmwareVersion());
+}
+
+/*******************************************************************
+ * \brief gets Detector Software Version
+ * \return Detector Software Version
+ *******************************************************************/
+std::string Camera::getDetectorSoftwareVersion() const
+{
+    DEB_MEMBER_FUNCT();
+    return convertVersionToString(m_detector_control->getDetectorSoftwareVersion());
 }
 
 //==================================================================
