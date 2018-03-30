@@ -38,6 +38,11 @@
 #include "lima/ThreadUtils.h"
 #include "lima/HwSyncCtrlObj.h"
 #include "SlsJungfrauCameraThread.h"
+#include <yat/memory/SharedPtr.h>
+
+// defines the sls slsDetectorUsers class
+// Class for detector functionalities to embed the detector controls in the users custom interface e.g. EPICS, Lima etc.
+class slsDetectorUsers;
 
 namespace lima
 {
@@ -59,11 +64,23 @@ namespace lima
 	            Idle, Waiting, Running, Error,
             };
 
+            enum ClockDivider
+            {
+                FullSpeed, HalfSpeed, QuarterSpeed, SuperSlowSpeed,
+            };
+
+            //==================================================================
             // constructor
-            Camera(const std::string & in_config_file_name);
+            Camera();
 
             // destructor (no need to be virtual)
             ~Camera();
+
+            //==================================================================
+            // Specifics methods management
+            //==================================================================
+             // inits the camera while setting the configuration file name
+            void init(const std::string & in_config_file_name);
 
             //==================================================================
             // Related to HwInterface
@@ -128,6 +145,15 @@ namespace lima
                 // gets the detector model
                 std::string getDetectorModel() const;
 
+                // gets Module Firmware Version
+                std::string getModuleFirmwareVersion() const;
+
+                // gets Detector Firmware Version
+                std::string getDetectorFirmwareVersion() const;
+
+                 // gets Detector Software Version
+                std::string getDetectorSoftwareVersion() const;
+
             //==================================================================
             // Related to HwSyncCtrlObj
             //==================================================================
@@ -183,6 +209,10 @@ namespace lima
             HwBufferCtrlObj * getBufferCtrlObj();
 
         private:
+            // converts a version id to a string
+            static std::string convertVersionToString(int64_t in_version);
+
+        private:
             friend class CameraThread;
 
             //------------------------------------------------------------------
@@ -196,7 +226,13 @@ namespace lima
             // camera stuff
             //------------------------------------------------------------------
             std::string m_config_file_name;
+
+            // Class for detector functionalities to embed the detector controls in the users custom interface e.g. EPICS, Lima etc.
+            yat::SharedPtr<slsDetectorUsers> m_detector_control;
+
             Camera::Status m_state;
+            std::string m_status;
+
             double m_exposure_time;
             double m_latency_time;
             int m_nb_frames;
@@ -205,7 +241,6 @@ namespace lima
             long m_max_height;
             long m_depth;
             std::string m_acq_mode_name;
-            std::string m_status;
             Size m_frame_size;
 
             //------------------------------------------------------------------
