@@ -34,6 +34,7 @@
 #include "SlsJungfrauCamera.h"
 
 #include <slsDetectorUsers.h>
+#include <sls_detector_defs.h>
 
 using namespace lima;
 using namespace lima::SlsJungfrau;
@@ -64,20 +65,28 @@ Camera::~Camera()
 void Camera::init(const std::string & in_config_file_name)
 {
     DEB_MEMBER_FUNCT();
-    
-    // inits the class attributes
+
+    // before, cleaning the shared memory
+    cleanSharedMemory();
+
+    // initing the class attributes
     m_config_file_name = in_config_file_name;
 
-    // create the detector control instance
+    // creating the detector control instance
     int id = 0;
 
     m_detector_control.reset(new slsDetectorUsers(id));
 
     // configuration file is used to properly configure advanced settings in the shared memory
-    m_detector_control->readConfigurationFile(m_config_file_name);
+    int result = m_detector_control->readConfigurationFile(m_config_file_name);
+
+    if(result == CallResult::FAIL)
+    {
+        THROW_HW_ERROR(ErrorType::Error) << "readConfigurationFile failed! Could not initialize the camera!";
+    }
 
     // Setting the detector online
-    m_detector_control->setOnline(1);
+    m_detector_control->setOnline(slsDetectorDefs::ONLINE_FLAG);
 
     // starting the acquisition thread
     m_thread.start();
@@ -85,6 +94,16 @@ void Camera::init(const std::string & in_config_file_name)
     std::cout << "Module   Firmware Version : " << getModuleFirmwareVersion  () << std::endl;
     std::cout << "Detector Firmware Version : " << getDetectorFirmwareVersion() << std::endl;
     std::cout << "Detector Software Version : " << getDetectorSoftwareVersion() << std::endl;
+}
+
+/************************************************************************
+ * \brief cleans the shared memory used by the camera
+ ************************************************************************/
+void Camera::cleanSharedMemory()
+{
+	DEB_MEMBER_FUNCT();
+	string cmd = "for i in seq `ipcs -m | cut -d ' ' -f1`; do ipcrm -M $i; done;";
+    std::system(cmd.c_str());
 }
 
 //==================================================================
@@ -128,7 +147,68 @@ Camera::Status Camera::getStatus() const
 {
     DEB_MEMBER_FUNCT();
 
-    return Camera::Idle;
+    // In auto mode:
+    // Detector starts with idle to running and at end of acquisition, returns to idle.
+    //
+    // In trigger mode:
+    // Detector starts with idle to waiting and stays in waiting until it gets a trigger.
+    // Upon trigger, it switches to running and goes back to waiting again until it gets a trigger.
+    // Upon end of acquisition (after it get n triggers and m frames as configured), it will go to idle.
+    //
+    // If one explicitly calls stop acquisition:
+    // Detectors goes from running to idle.
+    //
+    // If there is fifo overflow:
+    // the detector will go to stopped state and stay there until the fifos are cleared.
+    // It should be concidered as an error.    
+
+    Camera::Status result;
+
+    // getting the detector status
+    int status = m_detector_control->getDetectorStatus();
+
+    status = slsDetectorDefs::runStatus::IDLE;
+
+    // ready to start acquisition
+    if(status == slsDetectorDefs::runStatus::IDLE)
+    {
+        result = Camera::Idle;
+    }
+    else
+    // waiting for trigger or gate signal 
+    if(status == slsDetectorDefs::runStatus::WAITING)
+    {
+        result = Camera::Waiting;
+    }
+    else
+    // acquisition is running 
+    if(status == slsDetectorDefs::runStatus::RUNNING)
+    {
+        result = Camera::Running;
+    }
+    else
+    // acquisition stopped externally, fifo full or unexpected error 
+    if((status == slsDetectorDefs::runStatus::ERROR  ) ||
+       (status == slsDetectorDefs::runStatus::STOPPED))
+    {
+        result = Camera::Error;
+    }
+    else
+    // these states do not apply to Jungfrau
+    // RUN_FINISHED : acquisition not running but data in memory 
+    // TRANSMITTING : acquisition running and data in memory 
+    if((status == slsDetectorDefs::runStatus::RUN_FINISHED) ||
+       (status == slsDetectorDefs::runStatus::TRANSMITTING))
+    {
+        THROW_HW_ERROR(ErrorType::Error) << "Camera::getStatus failed! An unexpected state was returned!";
+    }
+    else
+    // impossible state 
+    {
+        THROW_HW_ERROR(ErrorType::Error) << "Camera::getStatus failed! An unknown state was returned!";
+    }
+
+    return result;
 
 /*    int thread_status = m_thread.getStatus();
 
