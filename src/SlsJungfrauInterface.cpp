@@ -141,29 +141,30 @@ void Interface::stopAcq()
  *******************************************************************/
 void Interface::getStatus(StatusType & status)
 {
-    status.set(HwInterface::StatusType::Ready);
-    
-    // CCA:TODO
-    /*
-    Camera::Status camera_status = m_cam.getStatus();
+	DEB_MEMBER_FUNCT();
 
-    switch (camera_status)
+    HwInterface::StatusType::Basic hw_status;
+    Camera::Status                 camera_status = m_cam.getStatus();
+    
+    if(camera_status == Camera::Status::Idle)
     {
-        case Camera::Ready:
-          status.set(HwInterface::StatusType::Ready);
-          break;
-        case Camera::Exposure:
-          status.set(HwInterface::StatusType::Exposure);
-          break;
-        case Camera::Readout:
-          status.set(HwInterface::StatusType::Readout);
-          break;
-        case Camera::Latency:
-          status.set(HwInterface::StatusType::Latency);
-          break;
-        case Camera::Fault:
-          status.set(HwInterface::StatusType::Fault);
-    }*/
+        hw_status = HwInterface::StatusType::Ready;
+    }
+    else
+    if((camera_status == Camera::Status::Waiting) || 
+       (camera_status == Camera::Status::Running))
+    {
+        hw_status = HwInterface::StatusType::Exposure;
+    }
+    else
+    if(camera_status == Camera::Status::Error)
+    {
+        hw_status = HwInterface::StatusType::Fault;
+    }
+    
+    status.set(hw_status);
+
+	DEB_RETURN() << DEB_VAR1(status);
 }
 
 //==================================================================

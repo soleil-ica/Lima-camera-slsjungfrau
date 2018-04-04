@@ -59,14 +59,28 @@ namespace lima
             friend class Interface;
 
         public:
+            // status values
             enum Status
             {
-	            Idle, Waiting, Running, Error,
+	            Idle   , // ready to start acquisition
+                Waiting, // waiting for trigger or gate signal  
+                Running, // acquisition is running 
+                Error  , // acquisition stopped externally, fifo full or unexpected error 
             };
 
+            // clock divider values
             enum ClockDivider
             {
                 FullSpeed, HalfSpeed, QuarterSpeed, SuperSlowSpeed,
+            };
+
+            // return values of sls methods 
+            enum CallResult 
+            {
+                OK          , // function succeeded
+                FAIL        , // function failed
+                FINISHED    , // acquisition finished
+                FORCE_UPDATE
             };
 
             //==================================================================
@@ -79,7 +93,7 @@ namespace lima
             //==================================================================
             // Specifics methods management
             //==================================================================
-             // inits the camera while setting the configuration file name
+            // inits the camera while setting the configuration file name
             void init(const std::string & in_config_file_name);
 
             //==================================================================
@@ -209,8 +223,14 @@ namespace lima
             HwBufferCtrlObj * getBufferCtrlObj();
 
         private:
+            //==================================================================
+            // Specifics methods management
+            //==================================================================
             // converts a version id to a string
             static std::string convertVersionToString(int64_t in_version);
+
+            // cleans the shared memory used by the camera
+            void cleanSharedMemory();
 
         private:
             friend class CameraThread;
