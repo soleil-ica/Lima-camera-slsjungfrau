@@ -39,6 +39,9 @@ char mess[MAX_STR_LENGTH];
 int dataBytes = 10;
 int isControlServer = 0;
 int debugflag = 0;
+#ifdef EIGERD
+uint32_t dhcpipad = 0;
+#endif
 
 /* initialization functions */
 
@@ -64,6 +67,9 @@ void init_detector(int controlserver) {
 	if (controlserver) {
 	    isControlServer = 1;
 		initControlServer();
+#ifdef EIGERD
+		dhcpipad = getDetectorIP();
+#endif
 	}
 	else initStopServer();
 #endif
@@ -2988,7 +2994,7 @@ int set_speed(int file_des) {
 #ifdef JUNGFRAUD
 		case ADC_PHASE:
 			retval = adcPhase(val);
-            if ((val != 65536) && (retval!=val) && (val>=0)) {
+            if ((val != 100000) && (retval!=val) && (val>=0)) {
                 ret=FAIL;
                 sprintf(mess,"could not change set adc phase: should be %d but is %d \n", val, retval);
                 cprintf(RED, "Warning: %s", mess);
@@ -3488,16 +3494,19 @@ int configure_mac(int file_des) {
 			        printf("WARNING: Matched detectormac to the hardware mac now\n");
 			        printf("*************************************************\n");
 			    }
+
+			    // always remember the ip sent from the client (could be for 10g(if not dhcp))
+			    if (detipad != getDetectorIP())
+			        dhcpipad = detipad;
+
 			    //only for 1Gbe
 			    if(!enableTenGigabitEthernet(-1)){
-			        if (detipad != getDetectorIP()){
-			            printf("*************************************************\n");
-			            printf("WARNING: actual detector ip address %x does not match the one from client %x\n",getDetectorIP(),detipad);
-			            detipad = getDetectorIP();
-			            printf("WARNING: Matched detector ip to the hardware ip now\n");
-			            printf("*************************************************\n");
-			        }
-			    }
+			        printf("*************************************************\n");
+                    printf("WARNING: Using DHCP IP for Configuring MAC\n");
+                    printf("*************************************************\n");
+                    detipad = getDetectorIP();
+			    } else
+			        detipad = dhcpipad;
 #endif
 				retval=configureMAC(ipad,imacadd,idetectormacadd,detipad,udpport,udpport2,0);	//digitalTestBit);
 				if(retval==-1) {
