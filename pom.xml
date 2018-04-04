@@ -46,7 +46,7 @@
                             <includePath>slsDetectorPackage\slsDetectorSoftware\slsDetectorAnalysis</includePath>
                             <includePath>slsDetectorPackage\slsDetectorSoftware\slsReceiverInterface</includePath>
                             <includePath>slsDetectorPackage\slsDetectorSoftware\threadFiles</includePath>
-							<includePath>slsDetectorPackage\slsReceiverSoftware</includePath>
+							<includePath>slsDetectorPackage\slsReceiverSoftware\include</includePath>
                         </includePaths>         
                         <!-- define less verbose mode for gcc-->
                         <options>
