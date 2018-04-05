@@ -48,6 +48,8 @@ namespace lima
 {
     namespace SlsJungfrau
     {
+        static const int SLS_GET_VALUE = -1; // special value used to call set/get sls methods into get mode
+
         /***********************************************************************
          * \class Camera
          * \brief Hardware control object interface
@@ -135,14 +137,23 @@ namespace lima
                 // Gets the maximum image height
                 unsigned short getMaxHeight() const;
 
+                // Gets the image width
+                unsigned short getWidth() const;
+
+                // Gets the image height
+                unsigned short getHeight() const;
+
                 //------------------------------------------------------------------
                 // current image type management
                 //------------------------------------------------------------------
+                // gets the default image type
+                lima::ImageType getDefImageType() const;
+
                 // gets the current image type
-                ImageType getImageType() const;
+                lima::ImageType getImageType() const;
 
                 // sets the current image type
-                void setImageType(ImageType in_type);
+                void setImageType(lima::ImageType in_type);
 
                 //------------------------------------------------------------------
                 // pixel size management
@@ -245,23 +256,35 @@ namespace lima
             //------------------------------------------------------------------
             // camera stuff
             //------------------------------------------------------------------
+            // complete config file path
             std::string m_config_file_name;
 
             // Class for detector functionalities to embed the detector controls in the users custom interface e.g. EPICS, Lima etc.
             yat::SharedPtr<slsDetectorUsers> m_detector_control;
 
-            Camera::Status m_state;
-            std::string m_status;
+            // current bit depth
+            int m_bit_depth;
 
+            // maximum width
+            int m_max_width ;
+
+            // maximum height
+            int m_max_height;
+
+            // current width
+            int m_width ;
+
+            // current height
+            int m_height;
+
+/*          Camera::Status m_state ;
+            std::string    m_status;
             double m_exposure_time;
             double m_latency_time;
             int m_nb_frames;
             int m_trigger_mode;
-            long m_max_width;
-            long m_max_height;
-            long m_depth;
             std::string m_acq_mode_name;
-            Size m_frame_size;
+            Size m_frame_size;*/
 
             //------------------------------------------------------------------
             // main acquisition thread
