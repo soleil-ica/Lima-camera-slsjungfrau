@@ -66,17 +66,17 @@ namespace lima
             // gets the detector image size
             virtual void getDetectorImageSize(Size & det_image_size);
 
-            // ?
-	        virtual void getDefImageType(ImageType & def_image_type);
+            // gets the default image type
+	        virtual void getDefImageType(lima::ImageType & def_image_type);
 
             //==================================================================
             // current image type management
             //==================================================================
             // gets the current image type
-	        virtual void getCurrImageType(ImageType & curr_image_type);
+	        virtual void getCurrImageType(lima::ImageType & curr_image_type);
 
             // sets the current image type
-	        virtual void setCurrImageType(ImageType curr_image_type);
+	        virtual void setCurrImageType(lima::ImageType curr_image_type);
 
             //==================================================================
             // pixel size management

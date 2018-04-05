@@ -66,6 +66,8 @@ void Camera::init(const std::string & in_config_file_name)
 {
     DEB_MEMBER_FUNCT();
 
+    int result;
+
     // before, cleaning the shared memory
     cleanSharedMemory();
 
@@ -78,7 +80,7 @@ void Camera::init(const std::string & in_config_file_name)
     m_detector_control.reset(new slsDetectorUsers(id));
 
     // configuration file is used to properly configure advanced settings in the shared memory
-    int result = m_detector_control->readConfigurationFile(m_config_file_name);
+    result = m_detector_control->readConfigurationFile(m_config_file_name);
 
     if(result == CallResult::FAIL)
     {
@@ -88,9 +90,40 @@ void Camera::init(const std::string & in_config_file_name)
     // Setting the detector online
     m_detector_control->setOnline(slsDetectorDefs::ONLINE_FLAG);
 
+    // getting the bit depth of the camera
+    m_bit_depth = m_detector_control->setBitDepth(SLS_GET_VALUE);
+
+    // getting the maximum detector size
+    result = m_detector_control->getMaximumDetectorSize(m_max_width, m_max_height);
+
+    if(result == CallResult::FAIL)
+    {
+        THROW_HW_ERROR(ErrorType::Error) << "getMaximumDetectorSize failed! Could not initialize the camera!";
+    }
+
+    // setting the detector size to the maximum
+    result = m_detector_control->setDetectorSize(0, 0, m_max_width, m_max_height);
+
+    if(result == CallResult::FAIL)
+    {
+        THROW_HW_ERROR(ErrorType::Error) << "setDetectorSize failed! Could not initialize the camera!";
+    }
+
+    // getting the detector size to be sure
+    int x0;
+    int y0;
+
+    result = m_detector_control->getDetectorSize(x0, y0, m_width, m_height);
+
+    if(result == CallResult::FAIL)
+    {
+        THROW_HW_ERROR(ErrorType::Error) << "getDetectorSize failed! Could not initialize the camera!";
+    }
+
     // starting the acquisition thread
     m_thread.start();
 
+    // logging some versions informations
     std::cout << "Module   Firmware Version : " << getModuleFirmwareVersion  () << std::endl;
     std::cout << "Detector Firmware Version : " << getDetectorFirmwareVersion() << std::endl;
     std::cout << "Detector Software Version : " << getDetectorSoftwareVersion() << std::endl;
@@ -256,9 +289,7 @@ int Camera::getNbHwAcquiredFrames() const
 unsigned short Camera::getMaxWidth() const
 {
     DEB_MEMBER_FUNCT();
-/*    DEB_RETURN() << DEB_VAR1(m_max_width);
-    return m_max_width;*/
-    return 0;
+    return m_max_width;
 }
 
 /*******************************************************************
@@ -268,53 +299,94 @@ unsigned short Camera::getMaxWidth() const
 unsigned short Camera::getMaxHeight() const
 {
     DEB_MEMBER_FUNCT();
-//    DEB_RETURN() << DEB_VAR1(m_max_height);
-//    return m_max_height;
-    return 0;
+    return m_max_height;
 }
 
+/*******************************************************************
+ * \brief Gets the image width
+ * \return image width
+ *******************************************************************/
+unsigned short Camera::getWidth() const
+{
+    DEB_MEMBER_FUNCT();
+    return m_width;
+}
+
+/*******************************************************************
+ * \brief Gets the image height
+ * \return image height
+ *******************************************************************/
+unsigned short Camera::getHeight() const
+{
+    DEB_MEMBER_FUNCT();
+    return m_height;
+}
 
 //------------------------------------------------------------------
 // current image type management
 //------------------------------------------------------------------
 /*******************************************************************
+ * \brief gets the default image type
+ *******************************************************************/
+lima::ImageType Camera::getDefImageType() const
+{
+	DEB_MEMBER_FUNCT();
+    return lima::ImageType::Bpp16;
+}
+
+/*******************************************************************
  * \brief gets the current image type
  * \return current image type
 *******************************************************************/
-ImageType Camera::getImageType() const
+lima::ImageType Camera::getImageType() const
 {
     DEB_MEMBER_FUNCT();
 
-/*    switch(m_depth)
+    lima::ImageType type;
+
+    // getting the bit depth of the camera
+    int bit_depth = m_detector_control->setBitDepth(SLS_GET_VALUE);
+
+    switch(bit_depth)
     {
-        case 16: type = Bpp16;
+        case 16: 
+            type = lima::ImageType::Bpp16;
             break;
         
         default:
-            THROW_HW_ERROR(Error) << "This pixel format of the camera is not managed, only 16 bits cameras are already managed!";
+            THROW_HW_ERROR(ErrorType::Error) << "This pixel format of the camera is not managed, only 16 bits cameras are managed!";
             break;
-    }*/
+    }
+
+    return type;
 }
 
 /*******************************************************************
  * \brief sets the current image type
  * @param in_type new image type
  *******************************************************************/
-void Camera::setImageType(ImageType in_type)
+void Camera::setImageType(lima::ImageType in_type)
 {
     DEB_MEMBER_FUNCT();
-    DEB_TRACE() << "Camera::setImageType - " << DEB_VAR1(in_type);
 
-/*    switch(type)
+    int bit_depth;
+
+    switch(in_type)
     {
-        case Bpp16:
-            m_depth = 16;
+        case lima::ImageType::Bpp16:
+            bit_depth = 16;
             break;
         
         default:
-            THROW_HW_ERROR(Error) << "This pixel format of the camera is not managed, only 16 bits cameras are already managed!";
+            THROW_HW_ERROR(ErrorType::Error) << "This pixel format of the camera is not managed, only 16 bits cameras are managed!";
             break;
-    }*/
+    }
+
+    // setting the bit depth of the camera
+    m_detector_control->setBitDepth(bit_depth);
+
+    // store the value in a class variable
+    m_bit_depth = bit_depth;
 }
 
 //------------------------------------------------------------------
@@ -328,9 +400,7 @@ void Camera::setImageType(ImageType in_type)
 void Camera::getPixelSize(double & out_x_size, double & out_y_size) const
 {
 	DEB_MEMBER_FUNCT();
-
-// CCA:TODO
-//		x_size = y_size = std::numeric_limits<double>::quiet_NaN();
+	out_x_size = out_y_size = 75e-6;
 }
 
 //------------------------------------------------------------------
@@ -343,8 +413,9 @@ void Camera::getPixelSize(double & out_x_size, double & out_y_size) const
 std::string Camera::getDetectorType() const
 {
 	DEB_MEMBER_FUNCT();
-    std::string type = "SlsJungfrau";
-    DEB_RETURN() << type;
+
+    // getting the detector type from the camera
+    std::string type = m_detector_control->getDetectorDeveloper();
     return type;
 }
 
@@ -355,8 +426,9 @@ std::string Camera::getDetectorType() const
 std::string Camera::getDetectorModel() const
 {
     DEB_MEMBER_FUNCT();
-    std::string model = "To be defined";
-    DEB_RETURN() << model;
+
+    // getting the detector model from the camera (named type in sls sdk)
+    std::string model = m_detector_control->getDetectorType();
     return model;
 }
 

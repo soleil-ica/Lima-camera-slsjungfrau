@@ -62,7 +62,9 @@ void DetInfoCtrlObj::getMaxImageSize(Size & size)
 	DEB_MEMBER_FUNCT();
 
     // gets the max image size
-	getDetectorImageSize(size);
+	size = Size(m_cam.getMaxWidth(), m_cam.getMaxHeight());
+
+    DEB_RETURN() << DEB_VAR1(size);
 }
 
 /*******************************************************************
@@ -72,37 +74,39 @@ void DetInfoCtrlObj::getDetectorImageSize(Size& size)
 {
 	DEB_MEMBER_FUNCT();
 
-    // get the max image size of the detector
-	size = Size(m_cam.getMaxWidth(), m_cam.getMaxHeight());
-}
+    // gets the max image size of the detector
+	size = Size(m_cam.getWidth(), m_cam.getHeight());
 
-/*******************************************************************
- * \brief ?
- *******************************************************************/
-void DetInfoCtrlObj::getDefImageType(ImageType & image_type)
-{
-	DEB_MEMBER_FUNCT();
-
-// CCA:TODO
-//	m_cam.getImageType(image_type);
+    DEB_RETURN() << DEB_VAR1(size);
 }
 
 //==================================================================
 // current image type management
 //==================================================================
 /*******************************************************************
+ * \brief gets the default image type
+ *******************************************************************/
+void DetInfoCtrlObj::getDefImageType(lima::ImageType & image_type)
+{
+	DEB_MEMBER_FUNCT();
+    image_type = m_cam.getDefImageType();
+	DEB_RETURN() << DEB_VAR1(image_type);
+}
+
+/*******************************************************************
  * \brief gets the current image type
  *******************************************************************/
-void DetInfoCtrlObj::getCurrImageType(ImageType & image_type)
+void DetInfoCtrlObj::getCurrImageType(lima::ImageType & image_type)
 {
 	DEB_MEMBER_FUNCT();
     image_type = m_cam.getImageType();
+	DEB_RETURN() << DEB_VAR1(image_type);
 }
 
 /*******************************************************************
  * \brief sets the current image type
  *******************************************************************/
-void DetInfoCtrlObj::setCurrImageType(ImageType image_type)
+void DetInfoCtrlObj::setCurrImageType(lima::ImageType image_type)
 {
 	DEB_MEMBER_FUNCT();
 	m_cam.setImageType(image_type);
@@ -118,6 +122,7 @@ void DetInfoCtrlObj::getPixelSize(double & x_size, double & y_size)
 {
 	DEB_MEMBER_FUNCT();
     m_cam.getPixelSize(x_size, y_size);
+	DEB_RETURN() << DEB_VAR2(x_size, y_size);
 }
 
 //==================================================================
@@ -130,6 +135,7 @@ void DetInfoCtrlObj::getDetectorType(std::string & type)
 {
 	DEB_MEMBER_FUNCT();
     type = m_cam.getDetectorType();
+    DEB_RETURN() << type;
 }
 
 /*******************************************************************
@@ -139,6 +145,7 @@ void DetInfoCtrlObj::getDetectorModel(std::string & model)
 {
 	DEB_MEMBER_FUNCT();
 	model = m_cam.getDetectorModel();
+    DEB_RETURN() << model;
 }
 
 //==================================================================
