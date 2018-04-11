@@ -43,7 +43,7 @@ using namespace lima::SlsJungfrau;
 
 /************************************************************************
  * \brief constructor
- * @param in_config_file_name complete path to the configuration file
+ * \param in_config_file_name complete path to the configuration file
  ************************************************************************/
 Camera::Camera(): m_thread(*this)
 {
@@ -56,11 +56,17 @@ Camera::Camera(): m_thread(*this)
 Camera::~Camera()
 {
     DEB_DESTRUCTOR();
+
+    // releasing the detector control instance
+    m_detector_control.reset();
+
+    // releasing the controller class for detector receivers functionalities
+    m_detector_receivers.reset();
 }
 
 /************************************************************************
  * \brief inits the camera while setting the configuration file name
- * @param in_config_file_name complete path to the configuration file
+ * \param in_config_file_name complete path to the configuration file
  ************************************************************************/
 void Camera::init(const std::string & in_config_file_name)
 {
@@ -74,6 +80,12 @@ void Camera::init(const std::string & in_config_file_name)
     // initing the class attributes
     m_config_file_name = in_config_file_name;
 
+    // creating the controller class for detector receivers functionalities
+    m_detector_receivers.reset(new CameraReceivers(*this));
+
+    // creating the receivers (just one for Jungfrau)
+    m_detector_receivers->init(m_config_file_name, m_detector_receivers);
+
     // creating the detector control instance
     int id = 0;
 
@@ -82,9 +94,9 @@ void Camera::init(const std::string & in_config_file_name)
     // configuration file is used to properly configure advanced settings in the shared memory
     result = m_detector_control->readConfigurationFile(m_config_file_name);
 
-    if(result == CallResult::FAIL)
+    if(result == slsDetectorDefs::FAIL)
     {
-        THROW_HW_ERROR(ErrorType::Error) << "readConfigurationFile failed! Could not initialize the camera!";
+        THROW_HW_FATAL(ErrorType::Error) << "readConfigurationFile failed! Could not initialize the camera!";
     }
 
     // Setting the detector online
@@ -96,17 +108,9 @@ void Camera::init(const std::string & in_config_file_name)
     // getting the maximum detector size
     result = m_detector_control->getMaximumDetectorSize(m_max_width, m_max_height);
 
-    if(result == CallResult::FAIL)
+    if(result == slsDetectorDefs::FAIL)
     {
-        THROW_HW_ERROR(ErrorType::Error) << "getMaximumDetectorSize failed! Could not initialize the camera!";
-    }
-
-    // setting the detector size to the maximum
-    result = m_detector_control->setDetectorSize(0, 0, m_max_width, m_max_height);
-
-    if(result == CallResult::FAIL)
-    {
-        THROW_HW_ERROR(ErrorType::Error) << "setDetectorSize failed! Could not initialize the camera!";
+        THROW_HW_FATAL(ErrorType::Error) << "getMaximumDetectorSize failed! Could not initialize the camera!";
     }
 
     // getting the detector size to be sure
@@ -115,9 +119,9 @@ void Camera::init(const std::string & in_config_file_name)
 
     result = m_detector_control->getDetectorSize(x0, y0, m_width, m_height);
 
-    if(result == CallResult::FAIL)
+    if(result == slsDetectorDefs::FAIL)
     {
-        THROW_HW_ERROR(ErrorType::Error) << "getDetectorSize failed! Could not initialize the camera!";
+        THROW_HW_FATAL(ErrorType::Error) << "getDetectorSize failed! Could not initialize the camera!";
     }
 
     // starting the acquisition thread
@@ -134,8 +138,11 @@ void Camera::init(const std::string & in_config_file_name)
  ************************************************************************/
 void Camera::cleanSharedMemory()
 {
-	DEB_MEMBER_FUNCT();
-	string cmd = "for i in seq `ipcs -m | cut -d ' ' -f1`; do ipcrm -M $i; done;";
+    DEB_MEMBER_FUNCT();
+
+    string cmd = "ipcs -m | grep -E '^0x000016[0-9a-z]{2}' | "
+                 "awk '{print $2}' | while read m; do ipcrm -m $m; done";
+
     std::system(cmd.c_str());
 }
 
@@ -330,7 +337,7 @@ unsigned short Camera::getHeight() const
  *******************************************************************/
 lima::ImageType Camera::getDefImageType() const
 {
-	DEB_MEMBER_FUNCT();
+    DEB_MEMBER_FUNCT();
     return lima::ImageType::Bpp16;
 }
 
@@ -363,7 +370,7 @@ lima::ImageType Camera::getImageType() const
 
 /*******************************************************************
  * \brief sets the current image type
- * @param in_type new image type
+ * \param in_type new image type
  *******************************************************************/
 void Camera::setImageType(lima::ImageType in_type)
 {
@@ -394,13 +401,13 @@ void Camera::setImageType(lima::ImageType in_type)
 //------------------------------------------------------------------
 /*******************************************************************
  * \brief gets the pixel size
- * @param out_x_size width pixel size
- * @param out_y_size height pixel size
+ * \param out_x_size width pixel size
+ * \param out_y_size height pixel size
  *******************************************************************/
 void Camera::getPixelSize(double & out_x_size, double & out_y_size) const
 {
-	DEB_MEMBER_FUNCT();
-	out_x_size = out_y_size = 75e-6;
+    DEB_MEMBER_FUNCT();
+    out_x_size = out_y_size = 75e-6;
 }
 
 //------------------------------------------------------------------
@@ -412,7 +419,7 @@ void Camera::getPixelSize(double & out_x_size, double & out_y_size) const
  *******************************************************************/
 std::string Camera::getDetectorType() const
 {
-	DEB_MEMBER_FUNCT();
+    DEB_MEMBER_FUNCT();
 
     // getting the detector type from the camera
     std::string type = m_detector_control->getDetectorDeveloper();
@@ -434,12 +441,12 @@ std::string Camera::getDetectorModel() const
 
 /*******************************************************************
  * \brief converts a version id to a string
- * \return version in string format
+ * \return version in string format (uppercase & hexa)
  *******************************************************************/
 std::string Camera::convertVersionToString(int64_t in_version)
 {
     std::stringstream tempStream;
-    tempStream << in_version;
+    tempStream << "0x" << std::uppercase << std::hex << in_version;
     return tempStream.str();
 }
 
@@ -450,7 +457,8 @@ std::string Camera::convertVersionToString(int64_t in_version)
 std::string Camera::getModuleFirmwareVersion() const
 {
     DEB_MEMBER_FUNCT();
-    return convertVersionToString(m_detector_control->getModuleFirmwareVersion());
+    //Module firmware version does not exist for Jungfrau
+    return "";
 }
 
 /*******************************************************************
@@ -494,11 +502,11 @@ bool Camera::checkTrigMode(TrigMode in_trig_mode) const
         case IntTrig:
         case IntTrigMult:
         case ExtTrigSingle:
-    	    valid_mode = true;
+            valid_mode = true;
             break;
 
         default:
-	    valid_mode = false;
+        valid_mode = false;
             break;
     }
 
@@ -507,7 +515,7 @@ bool Camera::checkTrigMode(TrigMode in_trig_mode) const
 
 /*******************************************************************
  * \brief Sets the trigger mode
- * @param in_mode needed trigger mode 
+ * \param in_mode needed trigger mode 
  *                (IntTrig, ExtTrigSingle, ExtTrigMultiple)
  *******************************************************************/
 void Camera::setTrigMode(TrigMode in_mode)
@@ -570,7 +578,7 @@ double Camera::getExpTime() const
 
 /*******************************************************************
  * \brief Sets the exposure time
- * @param in_exp_time needed exposure time
+ * \param in_exp_time needed exposure time
 *******************************************************************/
 void Camera::setExpTime(double in_exp_time)
 {
@@ -596,7 +604,7 @@ double Camera::getLatencyTime() const
 
 /*******************************************************************
  * \brief Sets the latency time
- * @param in_latency_time needed latency time
+ * \param in_latency_time needed latency time
 *******************************************************************/
 void Camera::setLatencyTime(double in_latency_time) const
 {
@@ -611,7 +619,7 @@ void Camera::setLatencyTime(double in_latency_time) const
 //------------------------------------------------------------------
 /*******************************************************************
  * \brief Sets the number of frames
- * @param in_nb_frames number of needed frames
+ * \param in_nb_frames number of needed frames
 *******************************************************************/
 void Camera::setNbFrames(int in_nb_frames)
 {
@@ -646,15 +654,15 @@ HwSyncCtrlObj::ValidRangesType Camera::getValidRanges() const
 {
     DEB_MEMBER_FUNCT();
 // CCA:TODO
-	double          min_time = 10e-9;
-	double          max_time = 10e+9;
+    double          min_time = 10e-9;
+    double          max_time = 10e+9;
 
     HwSyncCtrlObj::ValidRangesType valid_ranges;
 
-	valid_ranges.min_exp_time = min_time;
-	valid_ranges.max_exp_time = max_time;
-	valid_ranges.min_lat_time = min_time;
-	valid_ranges.max_lat_time = max_time;
+    valid_ranges.min_exp_time = min_time;
+    valid_ranges.max_exp_time = max_time;
+    valid_ranges.min_lat_time = min_time;
+    valid_ranges.max_lat_time = max_time;
 
     return valid_ranges;
 }

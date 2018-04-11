@@ -39,7 +39,7 @@ using namespace lima::SlsJungfrau;
  *******************************************************************/
 SyncCtrlObj::SyncCtrlObj(Camera & cam) : HwSyncCtrlObj(), m_cam(cam)
 {
-	DEB_CONSTRUCTOR();
+    DEB_CONSTRUCTOR();
 }
 
 /*******************************************************************
@@ -57,7 +57,7 @@ SyncCtrlObj::~SyncCtrlObj()
  *******************************************************************/
 bool SyncCtrlObj::checkTrigMode(TrigMode trig_mode)
 {
-	DEB_MEMBER_FUNCT();
+    DEB_MEMBER_FUNCT();
     return m_cam.checkTrigMode(trig_mode);
 }
 
@@ -66,12 +66,12 @@ bool SyncCtrlObj::checkTrigMode(TrigMode trig_mode)
  *******************************************************************/
 void SyncCtrlObj::setTrigMode(TrigMode trig_mode)
 {
-	DEB_MEMBER_FUNCT();
+    DEB_MEMBER_FUNCT();
 
     if (!checkTrigMode(trig_mode))
         THROW_HW_ERROR(InvalidValue) << "Invalid " << DEB_VAR1(trig_mode);
 
-	m_cam.setTrigMode(trig_mode);
+    m_cam.setTrigMode(trig_mode);
 }
 
 /*******************************************************************
@@ -79,7 +79,7 @@ void SyncCtrlObj::setTrigMode(TrigMode trig_mode)
  *******************************************************************/
 void SyncCtrlObj::getTrigMode(TrigMode & trig_mode)
 {
-	DEB_MEMBER_FUNCT();
+    DEB_MEMBER_FUNCT();
     trig_mode = m_cam.getTrigMode();
 }
 
@@ -91,7 +91,7 @@ void SyncCtrlObj::getTrigMode(TrigMode & trig_mode)
  *******************************************************************/
 void SyncCtrlObj::setExpTime(double exp_time)
 {
-	DEB_MEMBER_FUNCT();
+    DEB_MEMBER_FUNCT();
     m_cam.setExpTime(exp_time);
 }
 
@@ -100,7 +100,7 @@ void SyncCtrlObj::setExpTime(double exp_time)
  *******************************************************************/
 void SyncCtrlObj::getExpTime(double & exp_time)
 {
-	DEB_MEMBER_FUNCT();
+    DEB_MEMBER_FUNCT();
     exp_time = m_cam.getExpTime();
 }
 
@@ -112,7 +112,7 @@ void SyncCtrlObj::getExpTime(double & exp_time)
  *******************************************************************/
 void SyncCtrlObj::setLatTime(double lat_time)
 {
-	DEB_MEMBER_FUNCT();
+    DEB_MEMBER_FUNCT();
     m_cam.setLatencyTime(lat_time);
 }
 
@@ -121,7 +121,7 @@ void SyncCtrlObj::setLatTime(double lat_time)
  *******************************************************************/
 void SyncCtrlObj::getLatTime(double & lat_time)
 {
-	DEB_MEMBER_FUNCT();
+    DEB_MEMBER_FUNCT();
     lat_time = m_cam.getLatencyTime();
 }
 
@@ -133,8 +133,8 @@ void SyncCtrlObj::getLatTime(double & lat_time)
  *******************************************************************/
 void SyncCtrlObj::setNbHwFrames(int nb_frames)
 {
-	DEB_MEMBER_FUNCT();
-	m_cam.setNbFrames(nb_frames);
+    DEB_MEMBER_FUNCT();
+    m_cam.setNbFrames(nb_frames);
 }
 
 /*******************************************************************
@@ -142,8 +142,8 @@ void SyncCtrlObj::setNbHwFrames(int nb_frames)
  *******************************************************************/
 void SyncCtrlObj::getNbHwFrames(int & nb_frames)
 {
-	DEB_MEMBER_FUNCT();
-	nb_frames = m_cam.getNbFrames();
+    DEB_MEMBER_FUNCT();
+    nb_frames = m_cam.getNbFrames();
 }
 
 //==================================================================
@@ -154,7 +154,7 @@ void SyncCtrlObj::getNbHwFrames(int & nb_frames)
  *******************************************************************/
 void SyncCtrlObj::getValidRanges(ValidRangesType & valid_ranges)
 {
-	DEB_MEMBER_FUNCT();
+    DEB_MEMBER_FUNCT();
     valid_ranges = m_cam.getValidRanges();
 }
 

@@ -42,7 +42,7 @@ using namespace lima::SlsJungfrau;
 /************************************************************************
  * \brief constructor
  ************************************************************************/
-CameraThread::CameraThread(Camera & cam) : m_cam(&cam)
+CameraThread::CameraThread(Camera & cam) : m_cam(cam)
 {
     DEB_MEMBER_FUNCT();
     DEB_TRACE() << "CameraThread::CameraThread - BEGIN";
@@ -75,7 +75,7 @@ void CameraThread::init()
 
 /************************************************************************
  * \brief command execution
-  * @param cmd command indentifier
+  * \param cmd command indentifier
 ************************************************************************/
 void CameraThread::execCmd(int cmd)
 {
@@ -107,20 +107,20 @@ void CameraThread::execStartAcq()
     bool bTraceAlreadyDone = false;
     setStatus(Exposure);
 
-    StdBufferCbMgr& buffer_mgr = m_cam->m_buffer_ctrl_obj.getBuffer();
+    StdBufferCbMgr & buffer_mgr = m_cam.m_buffer_ctrl_obj.getBuffer();
 
     // Start acquisition on aviex detector
-//    m_cam->_armDetector();
+//    m_cam._armDetector();
 
     /////////////////////////////////////////////////////////////////////////////////////////
     // Loop while :
-    //				m_nb_frames is not reached OR 
-    //				stop() is requested OR 
-    //				to infinity in "live mode"
+    //                m_nb_frames is not reached OR 
+    //                stop() is requested OR 
+    //                to infinity in "live mode"
     /////////////////////////////////////////////////////////////////////////////////////////
-/*    DEB_TRACE() << "CameraThread::execStartAcq - Loop while 'Nb. acquired frames' < " << (m_cam->m_nb_frames) << " ...";
+/*    DEB_TRACE() << "CameraThread::execStartAcq - Loop while 'Nb. acquired frames' < " << (m_cam.m_nb_frames) << " ...";
     bool continueAcq = true;
-    while(continueAcq && (!m_cam->m_nb_frames || m_cam->m_acq_frame_nb < (m_cam->m_nb_frames - 1)))
+    while(continueAcq && (!m_cam.m_nb_frames || m_cam.m_acq_frame_nb < (m_cam.m_nb_frames - 1)))
     {
         //Force quit the thread if command stop() is launched by client
         if(m_force_stop)
@@ -144,14 +144,14 @@ void CameraThread::execStartAcq()
         long total_frame_num = -1;
 
         //get the total nulmber of frames in order to check if a frame is available !
-        mx_status = mx_area_detector_get_total_num_frames(m_cam->m_mx_record, &total_frame_num);
+        mx_status = mx_area_detector_get_total_num_frames(m_cam.m_mx_record, &total_frame_num);
         CHECK_MX_STATUS(mx_status, "Camera::execStartAcq()");
 
         //compute the last frame number
         last_frame_num = total_frame_num - initial_fram_num - 1;
 
         //Wait while new Frame is not ready 
-        if(last_frame_num <= m_cam->m_acq_frame_nb)
+        if(last_frame_num <= m_cam.m_acq_frame_nb)
         {
             mx_msleep(1); //sleep 1ms
             continue;
@@ -161,9 +161,9 @@ void CameraThread::execStartAcq()
         DEB_TRACE() << "\t- last_frame_num  = " << last_frame_num;
 
         //New image(s) is ready
-        while(last_frame_num > m_cam->m_acq_frame_nb)
+        while(last_frame_num > m_cam.m_acq_frame_nb)
         {
-            int current_frame_nb = m_cam->m_acq_frame_nb + 1;
+            int current_frame_nb = m_cam.m_acq_frame_nb + 1;
             //Prepare frame Lima Ptr ...
             bTraceAlreadyDone = false;
             DEB_TRACE() << "\t- Prepare the Lima Frame ptr - " << DEB_VAR1(current_frame_nb);
@@ -175,24 +175,24 @@ void CameraThread::execStartAcq()
             MX_IMAGE_FRAME *image_frame = NULL;
 
             //Send corrections flags
-            DEB_TRACE() << "\t- Send the list of corrections flags to Mx library - correction_flags = " << m_cam->m_correction_flags;
-            mx_area_detector_set_correction_flags(m_cam->m_mx_record, m_cam->m_correction_flags);
+            DEB_TRACE() << "\t- Send the list of corrections flags to Mx library - correction_flags = " << m_cam.m_correction_flags;
+            mx_area_detector_set_correction_flags(m_cam.m_mx_record, m_cam.m_correction_flags);
 
             //Get the last image
             DEB_TRACE() << "\t- Get the last Frame From Mx - " << DEB_VAR1(current_frame_nb);
             //utility function that make : setup_frame() + readout_frame() + correct_frame() + transfer_frame().
-            MX_AREA_DETECTOR* ad = (MX_AREA_DETECTOR*) (m_cam->m_mx_record->record_class_struct);
-            mx_status = mx_area_detector_get_frame(m_cam->m_mx_record, current_frame_nb, &(ad->image_frame));
+            MX_AREA_DETECTOR* ad = (MX_AREA_DETECTOR*) (m_cam.m_mx_record->record_class_struct);
+            mx_status = mx_area_detector_get_frame(m_cam.m_mx_record, current_frame_nb, &(ad->image_frame));
             CHECK_MX_STATUS(mx_status, "Camera::execStartAcq()");
             image_frame = ad->image_frame;
 
             //compute the timestamp of current image
             DEB_TRACE() << "\t- Compute the Timestamp for the image - " << DEB_VAR1(current_frame_nb);
-            double timestamp = m_cam->computeTimestamp(image_frame, current_frame_nb);
+            double timestamp = m_cam.computeTimestamp(image_frame, current_frame_nb);
 
             //copy from the Mx buffer to the Lima buffer
             DEB_TRACE() << "\t- Copy Frame From Mx Ptr into the Lima ptr :";
-            size_t nb_bytes_to_copy = m_cam->m_frame_size.getWidth() * m_cam->m_frame_size.getHeight() * sizeof (unsigned short);
+            size_t nb_bytes_to_copy = m_cam.m_frame_size.getWidth() * m_cam.m_frame_size.getHeight() * sizeof (unsigned short);
 
             size_t nb_bytes_copied;
             mx_status = mx_image_copy_1d_pixel_array(image_frame,
@@ -202,7 +202,7 @@ void CameraThread::execStartAcq()
             CHECK_MX_STATUS(mx_status, "Camera::execStartAcq()");
 
             DEB_TRACE() << "\t- Timestamp  = " << std::fixed << timestamp << " (s)";
-            DEB_TRACE() << "\t- Frame size  = " << m_cam->m_frame_size;
+            DEB_TRACE() << "\t- Frame size  = " << m_cam.m_frame_size;
             DEB_TRACE() << "\t- NB. Bytes to Copy = " << nb_bytes_to_copy;
             DEB_TRACE() << "\t- NB. Copied Bytes  = " << nb_bytes_copied;
 
@@ -216,7 +216,7 @@ void CameraThread::execStartAcq()
             frame_info.acq_frame_nb = current_frame_nb;
             frame_info.frame_timestamp = computed_timestamp;
             buffer_mgr.newFrameReady(frame_info);
-            m_cam->m_acq_frame_nb = current_frame_nb;
+            m_cam.m_acq_frame_nb = current_frame_nb;
             DEB_TRACE() << "\n";
         }
     } // End while
@@ -228,7 +228,7 @@ void CameraThread::execStartAcq()
        DEB_TRACE() << "\n";
        DEB_TRACE() << "Stop the Acquisition.";
 
-//       mx_status = mx_area_detector_stop(m_cam->m_mx_record);
+//       mx_status = mx_area_detector_stop(m_cam.m_mx_record);
 //       CHECK_MX_STATUS(mx_status, "Camera::execStartAcq()")
 
        setStatus(Ready);
@@ -242,7 +242,7 @@ void CameraThread::execStartAcq()
  ************************************************************************/
 int CameraThread::getNbHwAcquiredFrames()
 {
-    return (m_cam->m_acq_frame_nb == -1) ? 0 : (m_cam->m_acq_frame_nb + 1);
+    return (m_cam.m_acq_frame_nb == -1) ? 0 : (m_cam.m_acq_frame_nb + 1);
 }
 
 //========================================================================================

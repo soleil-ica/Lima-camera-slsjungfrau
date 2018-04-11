@@ -41,6 +41,8 @@ namespace lima
 {
     namespace SlsJungfrau
     {
+        /**********************************************************************/
+        // defines the SlsJungfrau camera class for direct access
         class Camera;
 
         /***********************************************************************
@@ -87,7 +89,8 @@ namespace lima
             void execStartAcq();
 
         private:
-            Camera * m_cam;
+            // direct access to camera
+            Camera & m_cam;
         };
     }
 }

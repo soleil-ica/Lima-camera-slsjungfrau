@@ -97,7 +97,7 @@ namespace lima
             //==================================================================
             // Gets the number of acquired frames
             virtual int getNbHwAcquiredFrames();
-        	
+            
             //==================================================================
             // camera access methods
             //==================================================================
@@ -108,10 +108,10 @@ namespace lima
             const Camera& getCamera() const;
 
         private:
-	        Camera         & m_cam     ; // hardware class
-	        CapList          m_cap_list; // capability list
-	        DetInfoCtrlObj   m_det_info; // detector info control object
-	        SyncCtrlObj      m_sync    ; // synchronization data control object
+            Camera         & m_cam     ; // hardware class
+            CapList          m_cap_list; // capability list
+            DetInfoCtrlObj   m_det_info; // detector info control object
+            SyncCtrlObj      m_sync    ; // synchronization data control object
         };
     } // namespace SlsJungfrau
 } // namespace lima
