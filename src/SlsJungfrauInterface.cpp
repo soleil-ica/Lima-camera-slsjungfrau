@@ -40,17 +40,17 @@ using namespace std;
  *******************************************************************/
 Interface::Interface(Camera & cam) : m_cam(cam), m_det_info(cam), m_sync(cam)
 {
-	DEB_CONSTRUCTOR();
+    DEB_CONSTRUCTOR();
 
     // No hardware binning or hardware ROIs yet for this camera
-	HwDetInfoCtrlObj *det_info = &m_det_info;
-	m_cap_list.push_back(HwCap(det_info));
+    HwDetInfoCtrlObj *det_info = &m_det_info;
+    m_cap_list.push_back(HwCap(det_info));
 
-	HwSyncCtrlObj *sync = &m_sync;
-	m_cap_list.push_back(HwCap(sync));
+    HwSyncCtrlObj *sync = &m_sync;
+    m_cap_list.push_back(HwCap(sync));
     
-	HwBufferCtrlObj *buffer = cam.getBufferCtrlObj();
-	m_cap_list.push_back(HwCap(buffer));
+    HwBufferCtrlObj *buffer = cam.getBufferCtrlObj();
+    m_cap_list.push_back(HwCap(buffer));
 }
 
 /*******************************************************************
@@ -58,7 +58,7 @@ Interface::Interface(Camera & cam) : m_cam(cam), m_det_info(cam), m_sync(cam)
  *******************************************************************/
 Interface::~Interface()
 {
-	DEB_DESTRUCTOR();
+    DEB_DESTRUCTOR();
 }
 
 //==================================================================
@@ -72,8 +72,8 @@ Interface::~Interface()
  *******************************************************************/
 void Interface::getCapList(HwInterface::CapList & cap_list) const
 {
-	DEB_MEMBER_FUNCT();
-	cap_list = m_cap_list;
+    DEB_MEMBER_FUNCT();
+    cap_list = m_cap_list;
 }
 
 //==================================================================
@@ -84,23 +84,23 @@ void Interface::getCapList(HwInterface::CapList & cap_list) const
  *******************************************************************/
 void Interface::reset(ResetLevel reset_level)
 {
-	DEB_MEMBER_FUNCT();
-	DEB_PARAM() << DEB_VAR1(reset_level);
+    DEB_MEMBER_FUNCT();
+    DEB_PARAM() << DEB_VAR1(reset_level);
 
-	stopAcq();
+    stopAcq();
 
 // CCA:TODO
-/*	Size image_size;
-	m_det_info.getMaxImageSize(image_size);
-	ImageType image_type;
-	m_det_info.getDefImageType(image_type);
-	FrameDim frame_dim(image_size, image_type);
+/*    Size image_size;
+    m_det_info.getMaxImageSize(image_size);
+    ImageType image_type;
+    m_det_info.getDefImageType(image_type);
+    FrameDim frame_dim(image_size, image_type);
 
-	HwBufferCtrlObj *buffer = m_cam.getBufferCtrlObj();
-	buffer->setFrameDim(frame_dim);
+    HwBufferCtrlObj *buffer = m_cam.getBufferCtrlObj();
+    buffer->setFrameDim(frame_dim);
 
-	buffer->setNbConcatFrames(1);
-	buffer->setNbBuffers(1);*/
+    buffer->setNbConcatFrames(1);
+    buffer->setNbBuffers(1);*/
 }
 
 //==================================================================
@@ -111,8 +111,8 @@ void Interface::reset(ResetLevel reset_level)
  *******************************************************************/
 void Interface::prepareAcq()
 {
-	DEB_MEMBER_FUNCT();
-	m_cam.prepareAcq();
+    DEB_MEMBER_FUNCT();
+    m_cam.prepareAcq();
 }
 
 /*******************************************************************
@@ -120,7 +120,7 @@ void Interface::prepareAcq()
  *******************************************************************/
 void Interface::startAcq()
 {
-	DEB_MEMBER_FUNCT();
+    DEB_MEMBER_FUNCT();
     m_cam.startAcq();
 }
 
@@ -129,8 +129,8 @@ void Interface::startAcq()
  *******************************************************************/
 void Interface::stopAcq()
 {
-	DEB_MEMBER_FUNCT();
-	m_cam.stopAcq();
+    DEB_MEMBER_FUNCT();
+    m_cam.stopAcq();
 }
 
 //==================================================================
@@ -141,7 +141,7 @@ void Interface::stopAcq()
  *******************************************************************/
 void Interface::getStatus(StatusType & status)
 {
-	DEB_MEMBER_FUNCT();
+    DEB_MEMBER_FUNCT();
 
     HwInterface::StatusType::Basic hw_status;
     Camera::Status                 camera_status = m_cam.getStatus();
@@ -164,7 +164,7 @@ void Interface::getStatus(StatusType & status)
     
     status.set(hw_status);
 
-	DEB_RETURN() << DEB_VAR1(status);
+    DEB_RETURN() << DEB_VAR1(status);
 }
 
 //==================================================================
@@ -175,11 +175,11 @@ void Interface::getStatus(StatusType & status)
  *******************************************************************/
 int Interface::getNbHwAcquiredFrames()
 {
-	DEB_MEMBER_FUNCT();
+    DEB_MEMBER_FUNCT();
 
     int NbHwAcquiredFrames = m_cam.getNbHwAcquiredFrames();
 
-	DEB_RETURN() << DEB_VAR1(NbHwAcquiredFrames);
+    DEB_RETURN() << DEB_VAR1(NbHwAcquiredFrames);
 
     return NbHwAcquiredFrames;
 }

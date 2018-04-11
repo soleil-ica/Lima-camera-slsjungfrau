@@ -38,9 +38,9 @@ using namespace lima::SlsJungfrau;
 /*******************************************************************
  * \brief constructor
  *******************************************************************/
-DetInfoCtrlObj::DetInfoCtrlObj(Camera& cam) :	m_cam(cam)
+DetInfoCtrlObj::DetInfoCtrlObj(Camera& cam) :    m_cam(cam)
 {
-	DEB_CONSTRUCTOR();
+    DEB_CONSTRUCTOR();
 }
 
 /*******************************************************************
@@ -48,7 +48,7 @@ DetInfoCtrlObj::DetInfoCtrlObj(Camera& cam) :	m_cam(cam)
  *******************************************************************/
 DetInfoCtrlObj::~DetInfoCtrlObj()
 {
-	DEB_DESTRUCTOR();
+    DEB_DESTRUCTOR();
 }
 
 //==================================================================
@@ -59,10 +59,10 @@ DetInfoCtrlObj::~DetInfoCtrlObj()
  *******************************************************************/
 void DetInfoCtrlObj::getMaxImageSize(Size & size)
 {
-	DEB_MEMBER_FUNCT();
+    DEB_MEMBER_FUNCT();
 
     // gets the max image size
-	size = Size(m_cam.getMaxWidth(), m_cam.getMaxHeight());
+    size = Size(m_cam.getMaxWidth(), m_cam.getMaxHeight());
 
     DEB_RETURN() << DEB_VAR1(size);
 }
@@ -72,10 +72,10 @@ void DetInfoCtrlObj::getMaxImageSize(Size & size)
  *******************************************************************/
 void DetInfoCtrlObj::getDetectorImageSize(Size& size)
 {
-	DEB_MEMBER_FUNCT();
+    DEB_MEMBER_FUNCT();
 
     // gets the max image size of the detector
-	size = Size(m_cam.getWidth(), m_cam.getHeight());
+    size = Size(m_cam.getWidth(), m_cam.getHeight());
 
     DEB_RETURN() << DEB_VAR1(size);
 }
@@ -88,9 +88,9 @@ void DetInfoCtrlObj::getDetectorImageSize(Size& size)
  *******************************************************************/
 void DetInfoCtrlObj::getDefImageType(lima::ImageType & image_type)
 {
-	DEB_MEMBER_FUNCT();
+    DEB_MEMBER_FUNCT();
     image_type = m_cam.getDefImageType();
-	DEB_RETURN() << DEB_VAR1(image_type);
+    DEB_RETURN() << DEB_VAR1(image_type);
 }
 
 /*******************************************************************
@@ -98,9 +98,9 @@ void DetInfoCtrlObj::getDefImageType(lima::ImageType & image_type)
  *******************************************************************/
 void DetInfoCtrlObj::getCurrImageType(lima::ImageType & image_type)
 {
-	DEB_MEMBER_FUNCT();
+    DEB_MEMBER_FUNCT();
     image_type = m_cam.getImageType();
-	DEB_RETURN() << DEB_VAR1(image_type);
+    DEB_RETURN() << DEB_VAR1(image_type);
 }
 
 /*******************************************************************
@@ -108,8 +108,8 @@ void DetInfoCtrlObj::getCurrImageType(lima::ImageType & image_type)
  *******************************************************************/
 void DetInfoCtrlObj::setCurrImageType(lima::ImageType image_type)
 {
-	DEB_MEMBER_FUNCT();
-	m_cam.setImageType(image_type);
+    DEB_MEMBER_FUNCT();
+    m_cam.setImageType(image_type);
 }
 
 //==================================================================
@@ -120,9 +120,9 @@ void DetInfoCtrlObj::setCurrImageType(lima::ImageType image_type)
  *******************************************************************/
 void DetInfoCtrlObj::getPixelSize(double & x_size, double & y_size)
 {
-	DEB_MEMBER_FUNCT();
+    DEB_MEMBER_FUNCT();
     m_cam.getPixelSize(x_size, y_size);
-	DEB_RETURN() << DEB_VAR2(x_size, y_size);
+    DEB_RETURN() << DEB_VAR2(x_size, y_size);
 }
 
 //==================================================================
@@ -133,7 +133,7 @@ void DetInfoCtrlObj::getPixelSize(double & x_size, double & y_size)
  *******************************************************************/
 void DetInfoCtrlObj::getDetectorType(std::string & type)
 {
-	DEB_MEMBER_FUNCT();
+    DEB_MEMBER_FUNCT();
     type = m_cam.getDetectorType();
     DEB_RETURN() << type;
 }
@@ -143,8 +143,8 @@ void DetInfoCtrlObj::getDetectorType(std::string & type)
  *******************************************************************/
 void DetInfoCtrlObj::getDetectorModel(std::string & model)
 {
-	DEB_MEMBER_FUNCT();
-	model = m_cam.getDetectorModel();
+    DEB_MEMBER_FUNCT();
+    model = m_cam.getDetectorModel();
     DEB_RETURN() << model;
 }
 
@@ -156,7 +156,7 @@ void DetInfoCtrlObj::getDetectorModel(std::string & model)
  *******************************************************************/
 void DetInfoCtrlObj::registerMaxImageSizeCallback(HwMaxImageSizeCallback & cb)
 {
-	//m_mis_cb_gen.registerMaxImageSizeCallback(cb);
+    //m_mis_cb_gen.registerMaxImageSizeCallback(cb);
 }
 
 /*******************************************************************
@@ -164,7 +164,7 @@ void DetInfoCtrlObj::registerMaxImageSizeCallback(HwMaxImageSizeCallback & cb)
  *******************************************************************/
 void DetInfoCtrlObj::unregisterMaxImageSizeCallback(HwMaxImageSizeCallback & cb)
 {
-	//m_mis_cb_gen.unregisterMaxImageSizeCallback(cb);
+    //m_mis_cb_gen.unregisterMaxImageSizeCallback(cb);
 }
 
 /*************************************************************************/

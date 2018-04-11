@@ -48,35 +48,35 @@ namespace lima
 
         class LIBSLSJUNGFRAU_API DetInfoCtrlObj: public HwDetInfoCtrlObj 
         {
-	        DEB_CLASS_NAMESPC(DebModCamera, "DetInfoCtrlObj", "SlsJungfrau");
+            DEB_CLASS_NAMESPC(DebModCamera, "DetInfoCtrlObj", "SlsJungfrau");
 
         public:
             // constructor
             DetInfoCtrlObj(Camera & cam);
 
             // destructor
-	        virtual ~DetInfoCtrlObj();
+            virtual ~DetInfoCtrlObj();
 
             //==================================================================
             // image size management
             //==================================================================
             // gets the maximum image size
-	        virtual void getMaxImageSize(Size & max_image_size);
-	        
+            virtual void getMaxImageSize(Size & max_image_size);
+            
             // gets the detector image size
             virtual void getDetectorImageSize(Size & det_image_size);
 
             // gets the default image type
-	        virtual void getDefImageType(lima::ImageType & def_image_type);
+            virtual void getDefImageType(lima::ImageType & def_image_type);
 
             //==================================================================
             // current image type management
             //==================================================================
             // gets the current image type
-	        virtual void getCurrImageType(lima::ImageType & curr_image_type);
+            virtual void getCurrImageType(lima::ImageType & curr_image_type);
 
             // sets the current image type
-	        virtual void setCurrImageType(lima::ImageType curr_image_type);
+            virtual void setCurrImageType(lima::ImageType curr_image_type);
 
             //==================================================================
             // pixel size management
@@ -97,13 +97,13 @@ namespace lima
             // maximum image size callback management
             //==================================================================
             // registers maximum image size callback
-	        virtual void registerMaxImageSizeCallback(HwMaxImageSizeCallback & cb);
-	        
+            virtual void registerMaxImageSizeCallback(HwMaxImageSizeCallback & cb);
+            
             // unregisters maximum image size callback
             virtual void unregisterMaxImageSizeCallback(HwMaxImageSizeCallback & cb);
 
         private:
-	        Camera & m_cam;
+            Camera & m_cam;
         };
     } // namespace SlsJungfrau
 } // namespace lima

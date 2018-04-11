@@ -38,9 +38,11 @@
 #include "lima/ThreadUtils.h"
 #include "lima/HwSyncCtrlObj.h"
 #include "SlsJungfrauCameraThread.h"
+#include "SlsJungfrauCameraReceivers.h"
 #include <yat/memory/SharedPtr.h>
 
-// defines the sls slsDetectorUsers class
+/**********************************************************************/
+// defines the SLS slsDetectorUsers class
 // Class for detector functionalities to embed the detector controls in the users custom interface e.g. EPICS, Lima etc.
 class slsDetectorUsers;
 
@@ -64,7 +66,7 @@ namespace lima
             // status values
             enum Status
             {
-	            Idle   , // ready to start acquisition
+                Idle   , // ready to start acquisition
                 Waiting, // waiting for trigger or gate signal  
                 Running, // acquisition is running 
                 Error  , // acquisition stopped externally, fifo full or unexpected error 
@@ -74,15 +76,6 @@ namespace lima
             enum ClockDivider
             {
                 FullSpeed, HalfSpeed, QuarterSpeed, SuperSlowSpeed,
-            };
-
-            // return values of sls methods 
-            enum CallResult 
-            {
-                OK          , // function succeeded
-                FAIL        , // function failed
-                FINISHED    , // acquisition finished
-                FORCE_UPDATE
             };
 
             //==================================================================
@@ -261,6 +254,9 @@ namespace lima
 
             // Class for detector functionalities to embed the detector controls in the users custom interface e.g. EPICS, Lima etc.
             yat::SharedPtr<slsDetectorUsers> m_detector_control;
+
+            // Controller class for detector receivers functionalities
+            yat::SharedPtr<CameraReceivers> m_detector_receivers;
 
             // current bit depth
             int m_bit_depth;
