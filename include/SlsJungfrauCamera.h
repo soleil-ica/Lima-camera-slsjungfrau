@@ -39,7 +39,6 @@
 #include "lima/HwSyncCtrlObj.h"
 #include "SlsJungfrauCameraThread.h"
 #include "SlsJungfrauCameraReceivers.h"
-#include <yat/memory/SharedPtr.h>
 
 /**********************************************************************/
 // defines the SLS slsDetectorUsers class
@@ -51,6 +50,9 @@ namespace lima
     namespace SlsJungfrau
     {
         static const int SLS_GET_VALUE = -1; // special value used to call set/get sls methods into get mode
+
+        static const std::string SLS_TRIGGER_MODE_AUTO    = "auto"   ; // there is no triggers enums in the current sls sdk
+        static const std::string SLS_TRIGGER_MODE_TRIGGER = "trigger"; // there is no triggers enums in the current sls sdk
 
         /***********************************************************************
          * \class Camera
@@ -73,9 +75,19 @@ namespace lima
             };
 
             // clock divider values
+            // We could use enum CLK_SPEED_INDEX in             
+            //slsDetectorPackage\slsDetectorSoftware\eigerDetectorServer\slsDetectorServer_defs.h
+            // but the definition is not complete.
             enum ClockDivider
             {
                 FullSpeed, HalfSpeed, QuarterSpeed, SuperSlowSpeed,
+            };
+
+            // file write enable values
+            enum FileWriteEnable
+            {
+                Disabled = 0,
+                Enabled  = 1,
             };
 
             //==================================================================
@@ -179,19 +191,21 @@ namespace lima
                 // trigger mode management
                 //------------------------------------------------------------------
                 // Checks the trigger mode validity
-                bool checkTrigMode(TrigMode in_trig_mode) const;
+                bool checkTrigMode(lima::TrigMode in_trig_mode) const;
 
                 // Sets the trigger mode
-                void setTrigMode(TrigMode in_mode);
+                void setTrigMode(lima::TrigMode in_mode);
 
                 // Gets the trigger mode
-                TrigMode getTrigMode() const;
+                // can not be const because internal member are updated during the call
+                lima::TrigMode getTrigMode();
 
                 //------------------------------------------------------------------
                 // exposure time management
                 //------------------------------------------------------------------
                 // Gets the exposure time
-                double getExpTime() const;
+                // can not be const because internal member are updated during the call
+                double getExpTime();
 
                 // Sets the exposure time
                 void setExpTime(double in_exp_time);
@@ -200,10 +214,11 @@ namespace lima
                 // latency time management
                 //------------------------------------------------------------------
                 // Gets the latency time
-                double getLatencyTime() const;
+                // can not be const because internal member are updated during the call
+                double getLatencyTime();
 
                 // Sets the latency time
-                void setLatencyTime(double in_latency_time) const;
+                void setLatencyTime(double in_latency_time);
 
                 //------------------------------------------------------------------
                 // number of frames management
@@ -212,7 +227,8 @@ namespace lima
                 void setNbFrames(int in_nb_frames);
 
                 // Gets the number of frames
-                int getNbFrames() const;
+                // can not be const because internal member are updated during the call
+                int getNbFrames();
 
                 //------------------------------------------------------------------
                 // valid ranges management
@@ -226,6 +242,36 @@ namespace lima
             // Gets the internal buffer manager
             HwBufferCtrlObj * getBufferCtrlObj();
 
+            //==================================================================
+            // Related to commands (put & get)
+            //==================================================================
+            // Executes a set command
+            std::string setCmd(const std::string & in_command);
+
+            // Executes a get command
+            std::string getCmd(const std::string & in_command);
+
+            //==================================================================
+            // Related to specifics attributes
+            //==================================================================
+            // Gets the threshold energy in eV
+            int getThresholdEnergy();
+
+            // Sets the threshold energy in eV
+            void setThresholdEnergy(int in_threshold_energy_eV);
+
+            // Gets the clock divider
+            lima::SlsJungfrau::Camera::ClockDivider getClockDivider();
+
+            // Sets the clock divider
+            void setClockDivider(lima::SlsJungfrau::Camera::ClockDivider in_clock_divider);
+
+            // Gets the delay after trigger (in seconds)
+            double getDelayAfterTrigger();
+
+            // Sets the delay after trigger (in seconds)
+            void setDelayAfterTrigger(double in_delay_after_trigger);
+
         private:
             //==================================================================
             // Specifics methods management
@@ -235,6 +281,20 @@ namespace lima
 
             // cleans the shared memory used by the camera
             void cleanSharedMemory();
+
+            // Updates exposure & latency times using camera data 
+            void updateTimes();
+
+            // Updates trigger data (mode, frame, cycle) using camera data 
+            void updateTriggerData();
+
+            // Converts a standard string to args arguments
+            void convertStringToArgs(const std::string & in_command,
+                                     char  * *         & out_argv  ,
+                                     int               & out_argc  );
+            // Releases args arguments
+            void releaseArgs(char * * & in_out_argv  ,
+                             int      & in_out_argc  );
 
         private:
             friend class CameraThread;
@@ -253,10 +313,10 @@ namespace lima
             std::string m_config_file_name;
 
             // Class for detector functionalities to embed the detector controls in the users custom interface e.g. EPICS, Lima etc.
-            yat::SharedPtr<slsDetectorUsers> m_detector_control;
+            lima::AutoPtr<slsDetectorUsers> m_detector_control;
 
             // Controller class for detector receivers functionalities
-            yat::SharedPtr<CameraReceivers> m_detector_receivers;
+            lima::AutoPtr<CameraReceivers> m_detector_receivers;
 
             // current bit depth
             int m_bit_depth;
@@ -273,14 +333,31 @@ namespace lima
             // current height
             int m_height;
 
+            // exposure time
+            double m_exposure_time;
+
+            // latency time
+            double m_latency_time;
+
+            // trigger mode label from sls sdk
+            std::string m_trig_mode_label;
+
+            // trigger mode 
+            lima::TrigMode m_trig_mode;
+
+            // number of frames per cycle from sls sdk
+            int m_nb_frames_per_cycle;
+
+            // number of cycle from sls sdk
+            int m_nb_cycles;
+
+            // number total of frames
+            int m_nb_frames;
+
 /*          Camera::Status m_state ;
             std::string    m_status;
-            double m_exposure_time;
-            double m_latency_time;
-            int m_nb_frames;
-            int m_trigger_mode;
-            std::string m_acq_mode_name;
-            Size m_frame_size;*/
+            std::string    m_acq_mode_name;
+            Size           m_frame_size;*/
 
             //------------------------------------------------------------------
             // main acquisition thread

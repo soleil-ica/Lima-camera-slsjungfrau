@@ -35,7 +35,6 @@
 #include "SlsJungfrauCompatibility.h"
 #include "lima/Constants.h"
 #include "lima/HwBufferMgr.h"
-#include <yat/memory/SharedPtr.h>
 #include <vector>
 
 /**********************************************************************/
@@ -70,9 +69,9 @@ namespace lima
             friend class CameraReceivers;
 
         private :
-            yat::SharedPtr<slsReceiverUsers > m_receiver  ; // sls receiver instance from sls sdk
-            std::string                       m_host_name ; // receiver host name  (part of the hostname value in config file)
-            int                               m_tcpip_port; // receiver tcpip port (value of rx_tcpport in config file)
+            lima::AutoPtr<slsReceiverUsers > m_receiver  ; // sls receiver instance from sls sdk
+            std::string                      m_host_name ; // receiver host name  (part of the hostname value in config file)
+            int                              m_tcpip_port; // receiver tcpip port (value of rx_tcpport in config file)
         }; 
 
         /***********************************************************************
@@ -90,8 +89,8 @@ namespace lima
             friend class CameraReceivers;
 
         private :
-            int                             m_receiver_index; // receiver index in m_receivers_info container
-            yat::SharedPtr<CameraReceivers> m_receivers     ; // direct access to the CameraReceivers object
+            int                            m_receiver_index; // receiver index in m_receivers_info container
+            lima::AutoPtr<CameraReceivers> m_receivers     ; // direct access to the CameraReceivers object
         };
 
         /***********************************************************************
@@ -116,7 +115,7 @@ namespace lima
             // as the CameraReceivers in already managed by a shared pointer
             // we can not use *this* to set the callbacks.
             void init(const std::string              & in_config_file_name  ,
-                      yat::SharedPtr<CameraReceivers>  in_detector_receivers);
+                      lima::AutoPtr<CameraReceivers>   in_detector_receivers);
 
         public :
 
@@ -149,39 +148,39 @@ namespace lima
                                      uint64_t in_frames_nb     );
 
             // Acquisition data management
-            void getAcquisitionData(int in_receiver_index);
+            void acquisitionDataReady(int in_receiver_index);
 
             //------------------------------------------------------------------
             // sls sdk callbacks
             //------------------------------------------------------------------
             // Start Acquisition Call back
-            static int StartAcq(char     * in_file_path ,
-                                char     * in_file_name ,
-                                uint64_t   in_file_index,
-                                uint32_t   in_data_size ,
-                                void     * in_user_data );
+            static int startedAcquisitionCallBack(char     * in_file_path ,
+                                                  char     * in_file_name ,
+                                                  uint64_t   in_file_index,
+                                                  uint32_t   in_data_size ,
+                                                  void     * in_user_data );
 
             // Acquisition Finished Call back
-            static void AcquisitionFinished(uint64_t   in_frames_nb,
-                                            void     * in_user_data);
+            static void finishedAcquisitionCallBack(uint64_t   in_frames_nb,
+                                                    void     * in_user_data);
 
             // Get Receiver Data Call back
-            static void GetData(uint64_t   in_frame_number  ,
-                                uint32_t   in_exp_length    ,
-                                uint32_t   in_packet_number ,
-                                uint64_t   in_bunch_id      ,
-                                uint64_t   in_timestamp     ,
-                                uint16_t   in_mod_id        ,
-                                uint16_t   in_x_coord       ,
-                                uint16_t   in_y_coord       ,
-                                uint16_t   in_z_coord       ,
-                                uint32_t   in_debug         ,
-                                uint16_t   in_round_r_number,
-                                uint8_t    in_det_type      ,
-                                uint8_t    in_version       ,
-                                char     * in_data_pointer  ,
-                                uint32_t   in_data_size     ,
-                                void     * in_user_data     );
+            static void acquisitionDataReadyCallBack(uint64_t   in_frame_number  ,
+                                                     uint32_t   in_exp_length    ,
+                                                     uint32_t   in_packet_number ,
+                                                     uint64_t   in_bunch_id      ,
+                                                     uint64_t   in_timestamp     ,
+                                                     uint16_t   in_mod_id        ,
+                                                     uint16_t   in_x_coord       ,
+                                                     uint16_t   in_y_coord       ,
+                                                     uint16_t   in_z_coord       ,
+                                                     uint32_t   in_debug         ,
+                                                     uint16_t   in_round_r_number,
+                                                     uint8_t    in_det_type      ,
+                                                     uint8_t    in_version       ,
+                                                     char     * in_data_pointer  ,
+                                                     uint32_t   in_data_size     ,
+                                                     void     * in_user_data     );
 
         private:
             // direct access to camera

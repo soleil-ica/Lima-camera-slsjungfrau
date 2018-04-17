@@ -69,7 +69,7 @@ void SyncCtrlObj::setTrigMode(TrigMode trig_mode)
     DEB_MEMBER_FUNCT();
 
     if (!checkTrigMode(trig_mode))
-        THROW_HW_ERROR(InvalidValue) << "Invalid " << DEB_VAR1(trig_mode);
+        THROW_HW_ERROR(InvalidValue) << "Invalid trigger mode:" << DEB_VAR1(trig_mode);
 
     m_cam.setTrigMode(trig_mode);
 }
