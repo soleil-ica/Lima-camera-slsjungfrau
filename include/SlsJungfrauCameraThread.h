@@ -36,6 +36,14 @@
 #include "lima/Constants.h"
 #include "lima/HwBufferMgr.h"
 #include "lima/ThreadUtils.h"
+#include "lima/HwEventCtrlObj.h"
+
+/*************************************************************************/
+#define REPORT_EVENT(desc)  {   \
+                                Event *my_event = new Event(Hardware,Event::Info, Event::Camera, Event::Default,desc); \
+                                m_cam.getEventCtrlObj()->reportEvent(my_event); \
+                            }
+/*************************************************************************/
 
 namespace lima
 {
@@ -55,14 +63,19 @@ namespace lima
             DEB_CLASS_NAMESPC(DebModCamera, "CameraThread", "SlsJungfrau");
 
         public:
+			// Status
             enum
-            { // Status
-                Ready = MaxThreadStatus, Exposure, Readout, Latency,
-            };
+			{ 
+				Idle    = MaxThreadStatus, // ready to manage acquisition
+                Running                  , // acquisition is running 
+                Error                    , // unexpected error
+			};
 
+            // Cmd
             enum
-            { // Cmd
-                StartAcq = MaxThreadCmd, StopAcq,
+            { 
+                StartAcq = MaxThreadCmd, // command used to start acquisition
+                StopAcq                , // command used to stop  acquisition
             };
 
             // constructor
@@ -71,11 +84,15 @@ namespace lima
             // starts the thread
             virtual void start();
 
-            // returns the acquired frame number
-            int getNbHwAcquiredFrames();
+        private:
+            // execute the start command
+            void execStartAcq();
 
-        public :
-            bool m_force_stop;
+            // execute the stop command
+            void execStopAcq();
+
+        private :
+            volatile bool m_force_stop;
 
         protected:
             // inits the thread
@@ -83,10 +100,6 @@ namespace lima
 
             // command execution
             virtual void execCmd(int cmd);
-
-        private:
-            // execute the start command
-            void execStartAcq();
 
         private:
             // direct access to camera

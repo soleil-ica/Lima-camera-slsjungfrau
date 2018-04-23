@@ -92,6 +92,10 @@ void SyncCtrlObj::getTrigMode(TrigMode & trig_mode)
 void SyncCtrlObj::setExpTime(double exp_time)
 {
     DEB_MEMBER_FUNCT();
+    
+    // no need to convert exp_time because 
+    // - camera exp time is in seconds
+    // - lima exp time is also in seconds (but shows in ms)
     m_cam.setExpTime(exp_time);
 }
 
@@ -101,6 +105,10 @@ void SyncCtrlObj::setExpTime(double exp_time)
 void SyncCtrlObj::getExpTime(double & exp_time)
 {
     DEB_MEMBER_FUNCT();
+
+    // no need to convert exp_time because 
+    // - camera exp time is in seconds
+    // - lima exp time is also in seconds (but shows in ms)
     exp_time = m_cam.getExpTime();
 }
 
@@ -113,6 +121,10 @@ void SyncCtrlObj::getExpTime(double & exp_time)
 void SyncCtrlObj::setLatTime(double lat_time)
 {
     DEB_MEMBER_FUNCT();
+
+    // no need to convert lat_time because 
+    // - camera latency time is in seconds
+    // - lima latency time is also in seconds (but shows in ms)
     m_cam.setLatencyTime(lat_time);
 }
 
@@ -122,6 +134,10 @@ void SyncCtrlObj::setLatTime(double lat_time)
 void SyncCtrlObj::getLatTime(double & lat_time)
 {
     DEB_MEMBER_FUNCT();
+
+    // no need to convert lat_time because 
+    // - camera latency time is in seconds
+    // - lima latency time is also in seconds (but shows in ms)
     lat_time = m_cam.getLatencyTime();
 }
 

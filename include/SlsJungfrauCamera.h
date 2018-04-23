@@ -38,6 +38,7 @@
 #include "lima/ThreadUtils.h"
 #include "lima/HwSyncCtrlObj.h"
 #include "SlsJungfrauCameraThread.h"
+#include "SlsJungfrauCameraFrames.h"
 #include "SlsJungfrauCameraReceivers.h"
 
 /**********************************************************************/
@@ -75,19 +76,9 @@ namespace lima
             };
 
             // clock divider values
-            // We could use enum CLK_SPEED_INDEX in             
-            //slsDetectorPackage\slsDetectorSoftware\eigerDetectorServer\slsDetectorServer_defs.h
-            // but the definition is not complete.
             enum ClockDivider
             {
                 FullSpeed, HalfSpeed, QuarterSpeed, SuperSlowSpeed,
-            };
-
-            // file write enable values
-            enum FileWriteEnable
-            {
-                Disabled = 0,
-                Enabled  = 1,
             };
 
             //==================================================================
@@ -118,17 +109,25 @@ namespace lima
                 // stops the acquisition
                 void stopAcq();
 
+                // Acquisition data management
+                void acquisitionDataReady(const int      in_receiver_index,
+                                          const uint64_t in_frame_index   ,
+                                          const uint32_t in_packet_number ,
+                                          const uint64_t in_timestamp     ,
+                                          const char *   in_data_pointer  ,
+                                          const uint32_t in_data_size     );
+
                 //------------------------------------------------------------------
                 // status management
                 //------------------------------------------------------------------
                 // returns the current camera status
-                Status getStatus() const;
+                Camera::Status getStatus() const;
 
                 //------------------------------------------------------------------
                 // Acquired frames management
                 //------------------------------------------------------------------
                 // Gets the number of acquired frames
-                int getNbHwAcquiredFrames() const;
+                uint64_t getNbAcquiredFrames() const;
 
             //==================================================================
             // Related to HwDetInfoCtrlObj
@@ -224,11 +223,11 @@ namespace lima
                 // number of frames management
                 //------------------------------------------------------------------
                 // Sets the number of frames
-                void setNbFrames(int in_nb_frames);
+                void setNbFrames(int64_t in_nb_frames);
 
                 // Gets the number of frames
                 // can not be const because internal member are updated during the call
-                int getNbFrames();
+                int64_t getNbFrames();
 
                 //------------------------------------------------------------------
                 // valid ranges management
@@ -272,6 +271,12 @@ namespace lima
             // Sets the delay after trigger (in seconds)
             void setDelayAfterTrigger(double in_delay_after_trigger);
 
+            //==================================================================
+            // Related to event control object
+            //==================================================================
+            // Gets the Lima event control object
+            HwEventCtrlObj* getEventCtrlObj();
+
         private:
             //==================================================================
             // Specifics methods management
@@ -296,15 +301,29 @@ namespace lima
             void releaseArgs(char * * & in_out_argv  ,
                              int      & in_out_argc  );
 
+            // Gets the internal number of frames (for thread access)
+            uint64_t getInternalNbFrames();
+
+            // Gets the frame manager const access
+            const CameraFrames & getFrameManager() const;
+
+            // Gets the frame manager access
+            CameraFrames & getFrameManager();
+
         private:
-            friend class CameraThread;
+            friend class CameraThread; // for getFrameManager(), getInternalNbFrames() and m_buffer_ctrl_obj accesses
+
+            //------------------------------------------------------------------
+            // Lima event control object
+            //------------------------------------------------------------------
+            HwEventCtrlObj m_event_ctrl_obj;
 
             //------------------------------------------------------------------
             // Lima buffer control object
             //------------------------------------------------------------------
             SoftBufferCtrlObj   m_buffer_ctrl_obj;
-            unsigned short    * m_frame          ;
-            unsigned short    * m_pr_buffer      ;
+//            unsigned short    * m_frame          ;
+            //unsigned short    * m_pr_buffer      ;
 
             //------------------------------------------------------------------
             // camera stuff
@@ -346,24 +365,23 @@ namespace lima
             lima::TrigMode m_trig_mode;
 
             // number of frames per cycle from sls sdk
-            int m_nb_frames_per_cycle;
+            int64_t m_nb_frames_per_cycle;
 
             // number of cycle from sls sdk
-            int m_nb_cycles;
+            int64_t m_nb_cycles;
 
             // number total of frames
-            int m_nb_frames;
-
-/*          Camera::Status m_state ;
-            std::string    m_status;
-            std::string    m_acq_mode_name;
-            Size           m_frame_size;*/
+            int64_t m_nb_frames;
 
             //------------------------------------------------------------------
             // main acquisition thread
             //------------------------------------------------------------------
             CameraThread m_thread;
-            int m_acq_frame_nb;
+
+            //------------------------------------------------------------------
+            // frames manager
+            //------------------------------------------------------------------
+            CameraFrames m_frames_manager;
 
             //------------------------------------------------------------------
             // mutex stuff
