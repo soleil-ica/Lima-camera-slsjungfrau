@@ -60,7 +60,7 @@ namespace lima
          * \class CameraReceiverInfo
          * \brief used to control the sls receivers
          *
-         * defines an info structure used to store Receiver informations 
+         * defines an info class used to store Receiver informations 
          * which were read from the configuration file.
          ***********************************************************************/
         class CameraReceiverInfo
@@ -148,7 +148,12 @@ namespace lima
                                      uint64_t in_frames_nb     );
 
             // Acquisition data management
-            void acquisitionDataReady(int in_receiver_index);
+            void acquisitionDataReady(const int      in_receiver_index,
+                                      uint64_t       in_frame_index   ,
+                                      const uint32_t in_packet_number ,
+                                      const uint64_t in_timestamp     ,
+                                      const char *   in_data_pointer  ,
+                                      const uint32_t in_data_size     );
 
             //------------------------------------------------------------------
             // sls sdk callbacks

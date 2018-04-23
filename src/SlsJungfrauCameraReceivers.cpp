@@ -205,11 +205,31 @@ void CameraReceivers::finishedAcquisition(int      in_receiver_index,
 /************************************************************************
  * \brief Acquisition data management
  * \param m_receiver_index receiver index
+ * \param in_frame_index frame index (starts at 1)
+ * \param in_packet_number number of packets caught for this frame
+ * \param in_timestamp time stamp in 10MHz clock
+ * \param in_data_pointer frame image pointer
+ * \param in_data_size frame image size 
  ************************************************************************/
-void CameraReceivers::acquisitionDataReady(int in_receiver_index)
+void CameraReceivers::acquisitionDataReady(const int      in_receiver_index,
+                                           uint64_t       in_frame_index   ,
+                                           const uint32_t in_packet_number ,
+                                           const uint64_t in_timestamp     ,
+                                           const char *   in_data_pointer  ,
+                                           const uint32_t in_data_size     )
 {
     DEB_MEMBER_FUNCT();
     DEB_TRACE() << "CameraReceivers::getAcquisitionData";
+
+    in_frame_index--; // Lima frame index starts at 0
+
+    // the camera will manage the new frame
+    m_cam.acquisitionDataReady(in_receiver_index, 
+                               in_frame_index   ,
+                               in_packet_number ,
+                               in_timestamp     ,
+                               in_data_pointer  ,
+                               in_data_size     );
 }
 
 //==================================================================
@@ -347,7 +367,7 @@ void CameraReceivers::createReceiversInfo(const std::string & in_config_file_nam
     else
     {
         // logging the result
-        std::cout << "Receivers list" << std::endl;
+        DEB_TRACE() << "Receivers list";
 
 	    for (size_t receiver_index = 0 ; receiver_index < m_receivers_info.size(); receiver_index++)
         {
@@ -551,7 +571,12 @@ void CameraReceivers::acquisitionDataReadyCallBack(uint64_t   in_frame_number  ,
     // the user data allows to have access to the 
     // CameraReceivers instance smart pointer and to the receiver index.
     CameraReceiverUserData * user_data = static_cast<CameraReceiverUserData *>(in_user_data);
-    user_data->m_receivers->acquisitionDataReady(user_data->m_receiver_index);
+    user_data->m_receivers->acquisitionDataReady(user_data->m_receiver_index,
+                                                 in_frame_number            ,
+                                                 in_packet_number           ,
+                                                 in_timestamp               ,
+                                                 in_data_pointer            ,
+                                                 in_data_size               );
 }
 
 //========================================================================================

@@ -45,7 +45,7 @@ using namespace lima::SlsJungfrau;
  * \brief constructor
  * \param in_config_file_name complete path to the configuration file
  ************************************************************************/
-Camera::Camera(): m_thread(*this)
+Camera::Camera(): m_thread(*this), m_frames_manager(*this)
 {
     DEB_CONSTRUCTOR();
 
@@ -139,7 +139,7 @@ void Camera::init(const std::string & in_config_file_name)
     }
 
     // disabling the file write by the camera
-    m_detector_control->enableWriteToFile(FileWriteEnable::Disabled);
+    m_detector_control->enableWriteToFile(slsDetectorDefs::DISABLED);
 
     // initing the internal copies of exposure & latency times
     updateTimes();
@@ -151,9 +151,9 @@ void Camera::init(const std::string & in_config_file_name)
     m_thread.start();
 
     // logging some versions informations
-    std::cout << "Module   Firmware Version : " << getModuleFirmwareVersion  () << std::endl;
-    std::cout << "Detector Firmware Version : " << getDetectorFirmwareVersion() << std::endl;
-    std::cout << "Detector Software Version : " << getDetectorSoftwareVersion() << std::endl;
+    DEB_TRACE() << "Module   Firmware Version : " << getModuleFirmwareVersion  ();
+    DEB_TRACE() << "Detector Firmware Version : " << getDetectorFirmwareVersion();
+    DEB_TRACE() << "Detector Software Version : " << getDetectorSoftwareVersion();
 }
 
 /************************************************************************
@@ -181,6 +181,24 @@ void Camera::cleanSharedMemory()
 void Camera::prepareAcq()
 {
     DEB_MEMBER_FUNCT();
+
+    // Only snap is allowed
+    {
+        int64_t nb_frames = getNbFrames();
+
+        if(nb_frames == 0LL)
+            THROW_HW_ERROR(ErrorType::Error) << "Start mode is not allowed for this device! Please use Snap mode.";
+    }
+
+
+    // reset the number of caught frames in the sdk
+    // in the next sdk release, we will use the method int resetFramesCaughtInReceiver().
+    // At the moment, we should use the put command.
+    // the given value 0 is just because put requires an argument, so it can be anything.
+    setCmd("resetframescaught 0");
+
+    // clear the frames containers
+    m_frames_manager.clear();
 }
 
 /*******************************************************************
@@ -189,6 +207,9 @@ void Camera::prepareAcq()
 void Camera::startAcq()
 {
     DEB_MEMBER_FUNCT();
+
+    m_thread.sendCmd(CameraThread::StartAcq);
+    m_thread.waitNotStatus(CameraThread::Idle);
 }
 
 /*******************************************************************
@@ -197,6 +218,59 @@ void Camera::startAcq()
 void Camera::stopAcq()
 {
     DEB_MEMBER_FUNCT();
+
+	DEB_TRACE() << "executing StopAcq command...";
+
+    if((getStatus() != Camera::Waiting) && (getStatus() != Camera::Running))
+    	DEB_WARNING() << "Execute a stop acq command but not in [Waiting,Running] status. " 
+                      << "status=" << getStatus() << ", " 
+                      << "thread status=" << m_thread.getStatus();
+
+    m_thread.sendCmd(CameraThread::StopAcq);
+    m_thread.waitStatus(CameraThread::Idle);
+}
+
+/************************************************************************
+ * \brief Acquisition data management
+ * \param m_receiver_index receiver index
+ * \param in_frame_index frame index (starts at 0)
+ * \param in_packet_number number of packets caught for this frame
+ * \param in_timestamp time stamp in 10MHz clock
+ * \param in_data_pointer frame image pointer
+ * \param in_data_size frame image size 
+ ************************************************************************/
+void Camera::acquisitionDataReady(const int      in_receiver_index,
+                                  const uint64_t in_frame_index   ,
+                                  const uint32_t in_packet_number ,
+                                  const uint64_t in_timestamp     ,
+                                  const char *   in_data_pointer  ,
+                                  const uint32_t in_data_size     )
+{
+    DEB_MEMBER_FUNCT();
+
+    // the start of this call is in a sls callback, so we should be as fast as possible
+    // to avoid frames lost.
+    StdBufferCbMgr & buffer_mgr  = m_buffer_ctrl_obj.getBuffer();
+    lima::FrameDim   frame_dim   = buffer_mgr.getFrameDim();
+    int              mem_size    = frame_dim.getMemSize();
+
+    // checking the frame size
+    if(mem_size != in_data_size)
+    {
+        DEB_TRACE() << "Incoherent sizes during frame copy process : " << 
+                       "sls size (" << in_data_size << ")" <<
+                       "lima size (" << mem_size << ")";
+    }
+    else
+    {
+        // copying the frame
+        char * dest_buffer = static_cast<char *>(buffer_mgr.getFrameBufferPtr(in_frame_index));
+        memcpy(dest_buffer, in_data_pointer, in_data_size);
+
+        // giving the frame to the frames manager
+        CameraFrame frame(in_frame_index, in_packet_number, in_timestamp);
+        m_frames_manager.addReceived(in_receiver_index, frame);
+    }
 }
 
 //------------------------------------------------------------------
@@ -210,98 +284,112 @@ Camera::Status Camera::getStatus() const
 {
     DEB_MEMBER_FUNCT();
 
-    // In auto mode:
-    // Detector starts with idle to running and at end of acquisition, returns to idle.
-    //
-    // In trigger mode:
-    // Detector starts with idle to waiting and stays in waiting until it gets a trigger.
-    // Upon trigger, it switches to running and goes back to waiting again until it gets a trigger.
-    // Upon end of acquisition (after it get n triggers and m frames as configured), it will go to idle.
-    //
-    // If one explicitly calls stop acquisition:
-    // Detectors goes from running to idle.
-    //
-    // If there is fifo overflow:
-    // the detector will go to stopped state and stay there until the fifos are cleared.
-    // It should be concidered as an error.    
-
     Camera::Status result;
 
-    // getting the detector status
-    int status = m_detector_control->getDetectorStatus();
+    int thread_status = m_thread.getStatus();
 
-    // ready to start acquisition
-    if(status == slsDetectorDefs::runStatus::IDLE)
-    {
-        result = Camera::Idle;
-    }
-    else
-    // waiting for trigger or gate signal 
-    if(status == slsDetectorDefs::runStatus::WAITING)
-    {
-        result = Camera::Waiting;
-    }
-    else
-    // acquisition is running 
-    if(status == slsDetectorDefs::runStatus::RUNNING)
-    {
-        result = Camera::Running;
-    }
-    else
-    // acquisition stopped externally, fifo full or unexpected error 
-    if((status == slsDetectorDefs::runStatus::ERROR  ) ||
-       (status == slsDetectorDefs::runStatus::STOPPED))
+    // error during the acquisition management ?
+    if(thread_status == CameraThread::Error)
     {
         result = Camera::Error;
     }
     else
-    // these states do not apply to Jungfrau
-    // RUN_FINISHED : acquisition not running but data in memory 
-    // TRANSMITTING : acquisition running and data in memory 
-    if((status == slsDetectorDefs::runStatus::RUN_FINISHED) ||
-       (status == slsDetectorDefs::runStatus::TRANSMITTING))
+    // using the hardware camera status
     {
-        THROW_HW_ERROR(ErrorType::Error) << "Camera::getStatus failed! An unexpected state was returned!";
-    }
-    else
-    // impossible state 
-    {
-        THROW_HW_ERROR(ErrorType::Error) << "Camera::getStatus failed! An unknown state was returned!";
+        // In auto mode:
+        // Detector starts with idle to running and at end of acquisition, returns to idle.
+        //
+        // In trigger mode:
+        // Detector starts with idle to waiting and stays in waiting until it gets a trigger.
+        // Upon trigger, it switches to running and goes back to waiting again until it gets a trigger.
+        // Upon end of acquisition (after it get n triggers and m frames as configured), it will go to idle.
+        //
+        // If one explicitly calls stop acquisition:
+        // Detectors goes from running to idle.
+        //
+        // If there is fifo overflow:
+        // the detector will go to stopped state and stay there until the fifos are cleared.
+        // It should be concidered as an error.    
+
+        // getting the detector status
+        int status = m_detector_control->getDetectorStatus();
+
+        // ready to start acquisition
+        if(status == slsDetectorDefs::runStatus::IDLE)
+        {
+            result = Camera::Idle;
+        }
+        else
+        // waiting for trigger or gate signal 
+        if(status == slsDetectorDefs::runStatus::WAITING)
+        {
+            result = Camera::Waiting;
+        }
+        else
+        // acquisition is running 
+        if(status == slsDetectorDefs::runStatus::RUNNING)
+        {
+            result = Camera::Running;
+        }
+        else
+        // acquisition stopped externally, fifo full or unexpected error 
+        if((status == slsDetectorDefs::runStatus::ERROR  ) ||
+           (status == slsDetectorDefs::runStatus::STOPPED))
+        {
+            result = Camera::Error;
+        }
+        else
+        // these states do not apply to Jungfrau
+        // RUN_FINISHED : acquisition not running but data in memory 
+        // TRANSMITTING : acquisition running and data in memory 
+        if((status == slsDetectorDefs::runStatus::RUN_FINISHED) ||
+           (status == slsDetectorDefs::runStatus::TRANSMITTING))
+        {
+            THROW_HW_ERROR(ErrorType::Error) << "Camera::getStatus failed! An unexpected state was returned!";
+        }
+        else
+        // impossible state 
+        {
+            THROW_HW_ERROR(ErrorType::Error) << "Camera::getStatus failed! An unknown state was returned!";
+        }
     }
 
     return result;
-
-/*    int thread_status = m_thread.getStatus();
-
-    DEB_RETURN() << DEB_VAR1(thread_status);
-
-    switch(thread_status)
-    {
-        case CameraThread::Ready:
-            return Camera::Ready;
-        case CameraThread::Exposure:
-            return Camera::Exposure;
-        case CameraThread::Readout:
-            return Camera::Readout;
-        case CameraThread::Latency:
-            return Camera::Latency;
-        default:
-            throw LIMA_HW_EXC(Error, "Invalid thread status");
-    }*/
 }
 
 //------------------------------------------------------------------
-// Acquired frames management
+// frames management
 //------------------------------------------------------------------
 /*******************************************************************
  * \brief Gets the number of acquired frames
  * \return current acquired frames number
  *******************************************************************/
-int Camera::getNbHwAcquiredFrames() const
+uint64_t Camera::getNbAcquiredFrames() const
 {
     DEB_MEMBER_FUNCT();
-    return 0;
-//    return (m_acq_frame_nb == -1) ? 0 : (m_acq_frame_nb + 1);
+
+    // reading in the number of treated frames in the frame manager
+    return m_frames_manager.getNbTreatedFrames();
+}
+
+/*******************************************************************
+ * \brief Gets the frame manager const access
+ * \return frame manager const reference
+ *******************************************************************/
+const CameraFrames & Camera::getFrameManager() const
+{
+    DEB_MEMBER_FUNCT();
+    return m_frames_manager;
+}
+
+/*******************************************************************
+ * \brief Gets the frame manager access
+ * \return frame manager reference
+ *******************************************************************/
+CameraFrames & Camera::getFrameManager()
+{
+    DEB_MEMBER_FUNCT();
+    return m_frames_manager;
 }
 
 //==================================================================
@@ -537,7 +625,7 @@ void Camera::updateTriggerData()
     else
     if(m_trig_mode_label == SLS_TRIGGER_MODE_TRIGGER)
     {
-        if(m_nb_cycles == 1)
+        if(m_nb_cycles == 1LL)
         {
             m_trig_mode = lima::TrigMode::ExtTrigSingle;
         }
@@ -723,7 +811,7 @@ double Camera::getLatencyTime()
 void Camera::setLatencyTime(double in_latency_time)
 {
     DEB_MEMBER_FUNCT();
-    DEB_TRACE() << "Camera::setLatencyTime - " << DEB_VAR1(in_latency_time) << " (s)";
+    DEB_TRACE() << "Camera::setLatencyTime - " << DEB_VAR1(in_latency_time) << " (sec)";
 
     m_detector_control->setExposurePeriod(m_exposure_time + in_latency_time, true); // in seconds
 
@@ -738,33 +826,33 @@ void Camera::setLatencyTime(double in_latency_time)
  * \brief Sets the number of frames
  * \param in_nb_frames number of needed frames
 *******************************************************************/
-void Camera::setNbFrames(int in_nb_frames)
+void Camera::setNbFrames(int64_t in_nb_frames)
 {
     DEB_MEMBER_FUNCT();
     DEB_TRACE() << "Camera::setNbFrames - " << DEB_VAR1(in_nb_frames);
-    if(in_nb_frames < 0)
+    if(in_nb_frames < 0LL)
         throw LIMA_HW_EXC(InvalidValue, "Invalid nb of frames");
 
     // updating the internal copies of trigger mode label, number of cyles, number of frames per cycle, number of frames
     updateTriggerData();
 
-    int nb_frames_per_cycle;
-    int nb_cycles          ;
+    int64_t nb_frames_per_cycle;
+    int64_t nb_cycles          ;
 
     switch (m_trig_mode)
     {       
         case lima::TrigMode::IntTrig:
             nb_frames_per_cycle = in_nb_frames;
-            nb_cycles           = 1;
+            nb_cycles           = 1LL;
             break;
 
         case lima::TrigMode::ExtTrigSingle:
             nb_frames_per_cycle = in_nb_frames;
-            nb_cycles           = 1;
+            nb_cycles           = 1LL;
             break;
 
         case lima::TrigMode::ExtTrigMult:
-            nb_frames_per_cycle = 1;
+            nb_frames_per_cycle = 1LL;
             nb_cycles           = in_nb_frames;
             break;
 
@@ -786,7 +874,7 @@ void Camera::setNbFrames(int in_nb_frames)
  * \brief Gets the number of frames
  * \return number of frames
  *******************************************************************/
-int Camera::getNbFrames()
+int64_t Camera::getNbFrames()
 {
     DEB_MEMBER_FUNCT();
 
@@ -794,6 +882,16 @@ int Camera::getNbFrames()
     updateTriggerData();
 
     return m_nb_frames;
+}
+
+/*******************************************************************
+ * \brief Gets the internal number of frames (for thread access)
+ * \return number of frames
+ *******************************************************************/
+uint64_t Camera::getInternalNbFrames()
+{
+    DEB_MEMBER_FUNCT();
+    return static_cast<uint64_t>(m_nb_frames);
 }
 
 //------------------------------------------------------------------
@@ -1048,9 +1146,21 @@ double Camera::getDelayAfterTrigger()
 void Camera::setDelayAfterTrigger(double in_delay_after_trigger)
 {
     DEB_MEMBER_FUNCT();
-    DEB_TRACE() << "Camera::setDelayAfterTrigger - " << DEB_VAR1(in_delay_after_trigger) << " (s)";
+    DEB_TRACE() << "Camera::setDelayAfterTrigger - " << DEB_VAR1(in_delay_after_trigger) << " (sec)";
 
-    m_detector_control->setDelayAfterTrigger(in_delay_after_trigger);
+    m_detector_control->setDelayAfterTrigger(in_delay_after_trigger, true); // in seconds
+}
+
+//==================================================================
+// Related to event control object
+//==================================================================
+/*******************************************************************
+ * \brief Gets the Lima event control object
+ * \return event control object pointer
+*******************************************************************/
+HwEventCtrlObj* Camera::getEventCtrlObj()
+{
+	return &m_event_ctrl_obj;
 }
 
 //========================================================================================

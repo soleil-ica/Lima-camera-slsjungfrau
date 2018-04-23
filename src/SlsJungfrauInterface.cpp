@@ -89,18 +89,19 @@ void Interface::reset(ResetLevel reset_level)
 
     stopAcq();
 
-// CCA:TODO
-/*    Size image_size;
+    Size              image_size;
+    ImageType         image_type;
+    HwBufferCtrlObj * buffer    ;
+
     m_det_info.getMaxImageSize(image_size);
-    ImageType image_type;
     m_det_info.getDefImageType(image_type);
+
     FrameDim frame_dim(image_size, image_type);
 
-    HwBufferCtrlObj *buffer = m_cam.getBufferCtrlObj();
-    buffer->setFrameDim(frame_dim);
-
+    buffer = m_cam.getBufferCtrlObj();
+    buffer->setFrameDim      (frame_dim);
     buffer->setNbConcatFrames(1);
-    buffer->setNbBuffers(1);*/
+    buffer->setNbBuffers     (1);
 }
 
 //==================================================================
@@ -177,11 +178,11 @@ int Interface::getNbHwAcquiredFrames()
 {
     DEB_MEMBER_FUNCT();
 
-    int NbHwAcquiredFrames = m_cam.getNbHwAcquiredFrames();
+    uint64_t NbHwAcquiredFrames = m_cam.getNbAcquiredFrames();
 
     DEB_RETURN() << DEB_VAR1(NbHwAcquiredFrames);
 
-    return NbHwAcquiredFrames;
+    return static_cast<int>(NbHwAcquiredFrames);
 }
 
 //==================================================================
