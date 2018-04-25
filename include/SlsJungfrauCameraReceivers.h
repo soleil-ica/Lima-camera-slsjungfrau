@@ -37,6 +37,9 @@
 #include "lima/HwBufferMgr.h"
 #include <vector>
 
+#include "SlsJungfrauCameraReceiverInfo.h"
+#include "SlsJungfrauCameraReceiverUserData.h"
+
 /**********************************************************************/
 // defines the SLS slsReceiverUsers class
 // Class for implementing the SLS data receiver in the users application.
@@ -50,48 +53,6 @@ namespace lima
         /**********************************************************************/
         // defines the SlsJungfrau camera class for direct access
         class Camera;
-
-        /**********************************************************************/
-        // pre-defines the CameraReceivers class for CameraReceiverInfo friend
-        // and CameraReceiverUserData friend links
-        class CameraReceivers;
-
-        /***********************************************************************
-         * \class CameraReceiverInfo
-         * \brief used to control the sls receivers
-         *
-         * defines an info class used to store Receiver informations 
-         * which were read from the configuration file.
-         ***********************************************************************/
-        class CameraReceiverInfo
-        {
-            // class CameraReceivers is a friend class of class CameraReceiverInfo
-            friend class CameraReceivers;
-
-        private :
-            lima::AutoPtr<slsReceiverUsers > m_receiver  ; // sls receiver instance from sls sdk
-            std::string                      m_host_name ; // receiver host name  (part of the hostname value in config file)
-            int                              m_tcpip_port; // receiver tcpip port (value of rx_tcpport in config file)
-        }; 
-
-        /***********************************************************************
-         * \struct CameraReceiverUserData
-         * \brief used as user data in sls sdk callbacks
-         *
-         * allows the callbacks :
-         * - to access to the CameraReceivers object
-         * - to know the receiver index which is not always given in
-         *   the callback data
-         ***********************************************************************/
-        class CameraReceiverUserData
-        {
-            // class CameraReceivers is a friend class of class CameraReceiverUserData
-            friend class CameraReceivers;
-
-        private :
-            int                            m_receiver_index; // receiver index in m_receivers_info container
-            lima::AutoPtr<CameraReceivers> m_receivers     ; // direct access to the CameraReceivers object
-        };
 
         /***********************************************************************
          * \class CameraReceivers
@@ -116,10 +77,6 @@ namespace lima
             // we can not use *this* to set the callbacks.
             void init(const std::string              & in_config_file_name  ,
                       lima::AutoPtr<CameraReceivers>   in_detector_receivers);
-
-        public :
-
-        protected:
 
         private:
             friend class CameraReceiverUserData;

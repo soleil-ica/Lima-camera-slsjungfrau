@@ -96,16 +96,15 @@ void CameraReceivers::init(const std::string              & in_config_file_name 
     	int ret = slsReceiverDefs::OK;
 
         // changing the udp port in the args
-	    sprintf(temp_port, "%d", m_receivers_info[receiver_index].m_tcpip_port);
+	    sprintf(temp_port, "%d", m_receivers_info[receiver_index].getTcpipPort());
 
         // creating the receiver using the args
         DEB_TRACE() << "creating the receiver "
                     << "(" << receiver_index << ") "
-                    << m_receivers_info[receiver_index].m_host_name << " - "
-                    << "tcpip port (" << m_receivers_info[receiver_index].m_tcpip_port << ")";
+                    << m_receivers_info[receiver_index].getHostName() << " - "
+                    << "tcpip port (" << m_receivers_info[receiver_index].getTcpipPort() << ")";
 
-        lima::AutoPtr<slsReceiverUsers > receiver;
-        receiver = new slsReceiverUsers(argc, args, ret);
+        lima::AutoPtr<slsReceiverUsers > receiver = new slsReceiverUsers(argc, args, ret);
 
         // managing a failed result
         if(ret == slsReceiverDefs::FAIL)
@@ -122,7 +121,7 @@ void CameraReceivers::init(const std::string              & in_config_file_name 
             DEB_TRACE() << "receiver created - version (" << receiver->getReceiverVersion() << ")";
 
             // in case of success, we set the receiver in the receivers informations container
-            m_receivers_info[receiver_index].m_receiver = receiver;
+            m_receivers_info[receiver_index].setReceiver(receiver);
         }
     }
 
@@ -132,14 +131,14 @@ void CameraReceivers::init(const std::string              & in_config_file_name 
     
     for(receiver_index = 0 ; receiver_index < m_receivers_info.size() ; receiver_index++)
     {
-        m_receivers_user_data[receiver_index].m_receiver_index = receiver_index       ;
-        m_receivers_user_data[receiver_index].m_receivers      = in_detector_receivers; // smart pointer copy
+        m_receivers_user_data[receiver_index].setReceiverIndex(receiver_index);
+        m_receivers_user_data[receiver_index].setReceivers(in_detector_receivers); // smart pointer copy
     }
 
     // setting the callbacks for the receivers
     for(receiver_index = 0 ; receiver_index < m_receivers_info.size() ; receiver_index++)
     {
-        lima::AutoPtr<slsReceiverUsers > receiver = m_receivers_info[receiver_index].m_receiver; // alias
+        lima::AutoPtr<slsReceiverUsers > receiver = m_receivers_info[receiver_index].getReceiver(); // alias
 
         DEB_TRACE() << "registering the receiver " << "(" << receiver_index << ") callbacks:";
 
@@ -163,7 +162,7 @@ void CameraReceivers::init(const std::string              & in_config_file_name 
     // starting the receivers
     for(receiver_index = 0 ; receiver_index < m_receivers_info.size() ; receiver_index++)
     {
-        lima::AutoPtr<slsReceiverUsers > receiver = m_receivers_info[receiver_index].m_receiver; // alias
+        lima::AutoPtr<slsReceiverUsers > receiver = m_receivers_info[receiver_index].getReceiver(); // alias
 
         if (receiver->start() == slsReceiverDefs::FAIL)
         {
@@ -220,8 +219,6 @@ void CameraReceivers::acquisitionDataReady(const int      in_receiver_index,
 {
     DEB_MEMBER_FUNCT();
     DEB_TRACE() << "CameraReceivers::getAcquisitionData";
-
-    in_frame_index--; // Lima frame index starts at 0
 
     // the camera will manage the new frame
     m_cam.acquisitionDataReady(in_receiver_index, 
@@ -304,11 +301,11 @@ void CameraReceivers::createReceiversInfo(const std::string & in_config_file_nam
                 {
                     // we set the data in the receiver info container
                     manageReceiversInfoResize(receiver_index);
-                    m_receivers_info[receiver_index].m_host_name = std::string(match_list[receiver_index][1]);
+                    m_receivers_info[receiver_index].setHostName(std::string(match_list[receiver_index][1]));
 
                     DEB_TRACE() << "hostname (" 
                                 << receiver_index << "):" 
-                                << m_receivers_info[receiver_index].m_host_name;
+                                << m_receivers_info[receiver_index].getHostName();
                 }
 
                 // no need to check other option, we jump to next line
@@ -350,7 +347,7 @@ void CameraReceivers::createReceiversInfo(const std::string & in_config_file_nam
 
                 // we set the data in the receiver info container
                 manageReceiversInfoResize(receiver_index);
-                m_receivers_info[receiver_index].m_tcpip_port = receiver_tcpip_port;
+                m_receivers_info[receiver_index].setTcpipPort(receiver_tcpip_port);
             }
 
             // no need to check other option, we jump to next line
@@ -371,9 +368,9 @@ void CameraReceivers::createReceiversInfo(const std::string & in_config_file_nam
 
 	    for (size_t receiver_index = 0 ; receiver_index < m_receivers_info.size(); receiver_index++)
         {
-            DEB_TRACE() << "hostname ("  << m_receivers_info[receiver_index].m_host_name << ")"
+            DEB_TRACE() << "hostname ("  << m_receivers_info[receiver_index].getHostName() << ")"
                         << " - "
-                        << "tcpip port (" << m_receivers_info[receiver_index].m_tcpip_port << ")"; 
+                        << "tcpip port (" << m_receivers_info[receiver_index].getTcpipPort() << ")"; 
         }
     }
 
@@ -498,7 +495,7 @@ int CameraReceivers::startedAcquisitionCallBack(char     * in_file_path ,
     // the user data allows to have access to the 
     // CameraReceivers instance smart pointer and to the receiver index.
     CameraReceiverUserData * user_data = static_cast<CameraReceiverUserData *>(in_user_data);
-    user_data->m_receivers->startedAcquisition(user_data->m_receiver_index);
+    user_data->getReceivers()->startedAcquisition(user_data->getReceiverIndex());
 
 	return 0;
 }
@@ -517,7 +514,7 @@ void CameraReceivers::finishedAcquisitionCallBack(uint64_t   in_frames_nb,
     // the user data allows to have access to the 
     // CameraReceivers instance smart pointer and to the receiver index.
     CameraReceiverUserData * user_data = static_cast<CameraReceiverUserData *>(in_user_data);
-    user_data->m_receivers->finishedAcquisition(user_data->m_receiver_index, in_frames_nb);
+    user_data->getReceivers()->finishedAcquisition(user_data->getReceiverIndex(), in_frames_nb);
 }
 
 /************************************************************************
@@ -571,12 +568,12 @@ void CameraReceivers::acquisitionDataReadyCallBack(uint64_t   in_frame_number  ,
     // the user data allows to have access to the 
     // CameraReceivers instance smart pointer and to the receiver index.
     CameraReceiverUserData * user_data = static_cast<CameraReceiverUserData *>(in_user_data);
-    user_data->m_receivers->acquisitionDataReady(user_data->m_receiver_index,
-                                                 in_frame_number            ,
-                                                 in_packet_number           ,
-                                                 in_timestamp               ,
-                                                 in_data_pointer            ,
-                                                 in_data_size               );
+    user_data->getReceivers()->acquisitionDataReady(user_data->getReceiverIndex(),
+                                                    in_frame_number              ,
+                                                    in_packet_number             ,
+                                                    in_timestamp                 ,
+                                                    in_data_pointer              ,
+                                                    in_data_size                 );
 }
 
 //========================================================================================

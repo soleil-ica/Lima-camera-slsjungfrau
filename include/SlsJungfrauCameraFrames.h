@@ -94,6 +94,16 @@ namespace lima
             // clear the containers
             void clear();
 
+            // store first frame data to compute relative data
+            void manageFirstFrameTreatment(const uint64_t in_absolute_frame_index,
+                                           const uint64_t in_absolute_timestamp  );
+
+            // compute the relative frame index (which starts at 0)
+            uint64_t computeRelativeFrameIndex(const uint64_t in_absolute_frame_index);
+
+            // compute the relative timestamp (which starts at 0)
+            uint64_t computeRelativeTimestamp(const uint64_t in_absolute_timestamp);
+
         private:
             // type of container which contains the frames not complete
         	typedef std::map<uint64_t, CameraFrame> ReceivedFramesContainer;
@@ -108,6 +118,7 @@ namespace lima
             // direct access to camera
             Camera & m_cam;
 
+            //==================================================================
             // important : a frame should always be in one of these tree containers.
             // container which contains the frames not complete
             ReceivedFramesContainer m_received_frames; 
@@ -118,9 +129,22 @@ namespace lima
             // container which contains the frames already passed to Lima newFrameReady method
             TreatedFramesContainer  m_treated_frames;
 
+            //==================================================================
             // used to protect the containers access
             // mutable keyword is used to allow const methods even if they use this class member
             mutable lima::Cond m_cond;
+
+            //==================================================================
+            // true if the first frame index has been received, else false.
+            bool m_is_first_frame_received;
+
+            // the frame index in the sls data callback is not reset for each new acquisition.
+            // so we need to store the first frame index to compute a relative frame index (which starts at 0)
+            uint64_t m_first_frame_index;
+            
+            // the frame timestamp in the sls data callback is not reset for each new acquisition.
+            // so we need to store the first timestamp to compute a relative timestamp (which starts at 0)
+            uint64_t m_first_timestamp;
         };
     }
 }

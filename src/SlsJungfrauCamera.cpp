@@ -263,12 +263,17 @@ void Camera::acquisitionDataReady(const int      in_receiver_index,
     }
     else
     {
+        m_frames_manager.manageFirstFrameTreatment(in_frame_index, in_timestamp);
+
+        uint64_t relative_frame_index = m_frames_manager.computeRelativeFrameIndex(in_frame_index);
+        uint64_t relative_timestamp   = m_frames_manager.computeRelativeTimestamp (in_timestamp  );
+
         // copying the frame
-        char * dest_buffer = static_cast<char *>(buffer_mgr.getFrameBufferPtr(in_frame_index));
+        char * dest_buffer = static_cast<char *>(buffer_mgr.getFrameBufferPtr(relative_frame_index));
         memcpy(dest_buffer, in_data_pointer, in_data_size);
 
         // giving the frame to the frames manager
-        CameraFrame frame(in_frame_index, in_packet_number, in_timestamp);
+        CameraFrame frame(relative_frame_index, in_packet_number, relative_timestamp);
         m_frames_manager.addReceived(in_receiver_index, frame);
     }
 }
