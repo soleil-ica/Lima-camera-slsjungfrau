@@ -252,6 +252,50 @@ void CameraFrames::clear()
     m_received_frames.clear();
     m_complete_frames.clear();
     m_treated_frames.clear ();
+
+    m_first_frame_index       = 0LL  ;
+    m_first_timestamp         = 0LL  ;
+    m_is_first_frame_received = false;
 }
+
+/************************************************************************
+ * \brief store first frame data to compute relative data
+ * \param in_absolute_frame_index index which cames with the callback
+ * \param in_absolute_timestamp timestamp which cames with the callback
+ ************************************************************************/
+void CameraFrames::manageFirstFrameTreatment(const uint64_t in_absolute_frame_index,
+                                             const uint64_t in_absolute_timestamp  )
+{
+    if(!m_is_first_frame_received)
+    {
+        m_first_frame_index       = in_absolute_frame_index;
+        m_first_timestamp         = in_absolute_timestamp  ;
+        m_is_first_frame_received = true;
+    }
+}
+
+/************************************************************************
+ * \brief compute the relative frame index (which starts at 0)
+ * \param in_absolute_frame_index index which cames with the callback
+ * \return relative frame index
+ ************************************************************************/
+uint64_t CameraFrames::computeRelativeFrameIndex(const uint64_t in_absolute_frame_index)
+{
+    DEB_MEMBER_FUNCT();
+
+    return (in_absolute_frame_index - m_first_frame_index);
+}   
+
+/************************************************************************
+ * \brief compute the relative timestamp (which starts at 0)
+ * \param in_absolute_timestamp timestamp which cames with the callback
+ * \return relative timestamp
+ ************************************************************************/
+uint64_t CameraFrames::computeRelativeTimestamp(const uint64_t in_absolute_timestamp)
+{
+    DEB_MEMBER_FUNCT();
+
+    return (in_absolute_timestamp - m_first_timestamp);
+}   
 
 //========================================================================================
