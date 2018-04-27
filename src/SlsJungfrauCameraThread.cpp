@@ -77,6 +77,16 @@ void CameraThread::init()
 }
 
 /************************************************************************
+ * \brief aborts the thread
+ ************************************************************************/
+void CameraThread::abort()
+{
+	DEB_MEMBER_FUNCT();
+    CmdThread::abort();
+	DEB_TRACE() << "DONE";
+}
+
+/************************************************************************
  * \brief command execution
  * \param cmd command indentifier
 ************************************************************************/
@@ -127,7 +137,7 @@ void CameraThread::execStopAcq()
 void CameraThread::execStartAcq()
 {
     DEB_MEMBER_FUNCT();
-	DEB_TRACE() << "executing StartAcq command...";
+    DEB_TRACE() << "executing StartAcq command...";
 
     m_force_stop = false;
 
@@ -142,18 +152,18 @@ void CameraThread::execStartAcq()
 
     // starting receiver listening mode
     if(detector_control->startReceiver() == slsDetectorDefs::FAIL)
-	{
+    {
         setStatus(CameraThread::Error);
 
         std::string errorText = "CameraThread::execStartAcq - can not start the receiver listening mode!";
         REPORT_EVENT(errorText);
         return;
-	}
+    }
 
     // starting real time acquisition in non blocking mode
     // returns OK if all detectors are properly started, FAIL otherwise
     if(detector_control->startAcquisition() == slsDetectorDefs::FAIL)
-	{
+    {
         detector_control->stopReceiver();
 
         setStatus(CameraThread::Error);
@@ -161,13 +171,13 @@ void CameraThread::execStartAcq()
         std::string errorText = "CameraThread::execStartAcq - can not start real time acquisition!";
         REPORT_EVENT(errorText);
         return;
-	}
+    }
 
     // setting the start timestamp
     Timestamp start_timestamp = Timestamp::now();
-	buffer_mgr.setStartTimestamp(start_timestamp);
+    buffer_mgr.setStartTimestamp(start_timestamp);
 
-	// Main acquisition loop
+    // Main acquisition loop
     // m_force_stop can be set to true by the StopAcq command to abort an acquisition
     // m_force_stop can be set to true also with an error hardware camera status
     // the loop can also end if the number of 
@@ -231,6 +241,22 @@ void CameraThread::execStartAcq()
         }
     }
     else
+    // problem occured during the acquisition
+    if(m_cam.getNbAcquiredFrames() < m_cam.getInternalNbFrames())
+    {
+        // stop detector acquisition
+        if(detector_control->stopAcquisition() == slsDetectorDefs::FAIL)
+        {
+            detector_control->stopReceiver(); // try to stop receiver listening mode
+
+            setStatus(CameraThread::Error);
+
+            std::string errorText = "CameraThread::execStartAcq - lost packets during real time acquisition!";
+            REPORT_EVENT(errorText);
+            return;
+        }
+    }
+    else
     // waiting for an idle hardware status
     {
         for(;;)
@@ -262,5 +288,4 @@ void CameraThread::execStartAcq()
 
     setStatus(CameraThread::Idle);
 }
-
 //========================================================================================

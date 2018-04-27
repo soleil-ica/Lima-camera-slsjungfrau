@@ -83,16 +83,10 @@ namespace lima
 
             //==================================================================
             // constructor
-            Camera();
+            Camera(const std::string & in_config_file_name);
 
             // destructor (no need to be virtual)
             ~Camera();
-
-            //==================================================================
-            // Specifics methods management
-            //==================================================================
-            // inits the camera while setting the configuration file name
-            void init(const std::string & in_config_file_name);
 
             //==================================================================
             // Related to HwInterface
@@ -238,77 +232,80 @@ namespace lima
             //==================================================================
             // Related to BufferCtrl object
             //==================================================================
-            // Gets the internal buffer manager
-            HwBufferCtrlObj * getBufferCtrlObj();
+                // Gets the internal buffer manager
+                HwBufferCtrlObj * getBufferCtrlObj();
 
             //==================================================================
             // Related to commands (put & get)
             //==================================================================
-            // Executes a set command
-            std::string setCmd(const std::string & in_command);
+                // Executes a set command
+                std::string setCmd(const std::string & in_command);
 
-            // Executes a get command
-            std::string getCmd(const std::string & in_command);
+                // Executes a get command
+                std::string getCmd(const std::string & in_command);
 
             //==================================================================
             // Related to specifics attributes
             //==================================================================
-            // Gets the threshold energy in eV
-            int getThresholdEnergy();
+                // Gets the threshold energy in eV
+                int getThresholdEnergy();
 
-            // Sets the threshold energy in eV
-            void setThresholdEnergy(int in_threshold_energy_eV);
+                // Sets the threshold energy in eV
+                void setThresholdEnergy(int in_threshold_energy_eV);
 
-            // Gets the clock divider
-            lima::SlsJungfrau::Camera::ClockDivider getClockDivider();
+                // Gets the clock divider
+                lima::SlsJungfrau::Camera::ClockDivider getClockDivider();
 
-            // Sets the clock divider
-            void setClockDivider(lima::SlsJungfrau::Camera::ClockDivider in_clock_divider);
+                // Sets the clock divider
+                void setClockDivider(lima::SlsJungfrau::Camera::ClockDivider in_clock_divider);
 
-            // Gets the delay after trigger (in seconds)
-            double getDelayAfterTrigger();
+                // Gets the delay after trigger (in seconds)
+                double getDelayAfterTrigger();
 
-            // Sets the delay after trigger (in seconds)
-            void setDelayAfterTrigger(double in_delay_after_trigger);
+                // Sets the delay after trigger (in seconds)
+                void setDelayAfterTrigger(double in_delay_after_trigger);
 
             //==================================================================
             // Related to event control object
             //==================================================================
-            // Gets the Lima event control object
-            HwEventCtrlObj* getEventCtrlObj();
+                // Gets the Lima event control object
+                HwEventCtrlObj* getEventCtrlObj();
 
         private:
             //==================================================================
             // Specifics methods management
             //==================================================================
-            // converts a version id to a string
-            static std::string convertVersionToString(int64_t in_version);
+                // inits the camera while setting the configuration file name
+                void init(const std::string & in_config_file_name);
 
-            // cleans the shared memory used by the camera
-            void cleanSharedMemory();
+                // converts a version id to a string
+                static std::string convertVersionToString(int64_t in_version);
 
-            // Updates exposure & latency times using camera data 
-            void updateTimes();
+                // cleans the shared memory used by the camera
+                void cleanSharedMemory();
 
-            // Updates trigger data (mode, frame, cycle) using camera data 
-            void updateTriggerData();
+                // Updates exposure & latency times using camera data 
+                void updateTimes();
 
-            // Converts a standard string to args arguments
-            void convertStringToArgs(const std::string & in_command,
-                                     char  * *         & out_argv  ,
-                                     int               & out_argc  );
-            // Releases args arguments
-            void releaseArgs(char * * & in_out_argv  ,
-                             int      & in_out_argc  );
+                // Updates trigger data (mode, frame, cycle) using camera data 
+                void updateTriggerData();
 
-            // Gets the internal number of frames (for thread access)
-            uint64_t getInternalNbFrames();
+                // Converts a standard string to args arguments
+                void convertStringToArgs(const std::string & in_command,
+                                         char  * *         & out_argv  ,
+                                         int               & out_argc  );
+                // Releases args arguments
+                void releaseArgs(char * * & in_out_argv  ,
+                                 int      & in_out_argc  );
 
-            // Gets the frame manager const access
-            const CameraFrames & getFrameManager() const;
+                // Gets the internal number of frames (for thread access)
+                uint64_t getInternalNbFrames();
 
-            // Gets the frame manager access
-            CameraFrames & getFrameManager();
+                // Gets the frame manager const access
+                const CameraFrames & getFrameManager() const;
+
+                // Gets the frame manager access
+                CameraFrames & getFrameManager();
 
         private:
             friend class CameraThread; // for getFrameManager(), getInternalNbFrames() and m_buffer_ctrl_obj accesses
@@ -322,8 +319,6 @@ namespace lima
             // Lima buffer control object
             //------------------------------------------------------------------
             SoftBufferCtrlObj   m_buffer_ctrl_obj;
-//            unsigned short    * m_frame          ;
-            //unsigned short    * m_pr_buffer      ;
 
             //------------------------------------------------------------------
             // camera stuff

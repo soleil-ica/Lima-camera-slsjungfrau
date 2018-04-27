@@ -45,7 +45,7 @@ using namespace lima::SlsJungfrau;
  * \brief constructor
  * \param in_config_file_name complete path to the configuration file
  ************************************************************************/
-Camera::Camera(): m_thread(*this), m_frames_manager(*this)
+Camera::Camera(const std::string & in_config_file_name): m_thread(*this), m_frames_manager(*this)
 {
     DEB_CONSTRUCTOR();
 
@@ -56,6 +56,8 @@ Camera::Camera(): m_thread(*this), m_frames_manager(*this)
     m_height        = 0;
     m_exposure_time = 0.0;
     m_latency_time  = 0.0;
+
+    init(in_config_file_name);
 }
 
 /************************************************************************
@@ -64,6 +66,9 @@ Camera::Camera(): m_thread(*this), m_frames_manager(*this)
 Camera::~Camera()
 {
     DEB_DESTRUCTOR();
+
+    // stopping the acquisition
+    stopAcq();
 
     // releasing the detector control instance
     m_detector_control = NULL;
@@ -79,6 +84,8 @@ Camera::~Camera()
 void Camera::init(const std::string & in_config_file_name)
 {
     DEB_MEMBER_FUNCT();
+
+    DEB_TRACE() << "config file name :" << in_config_file_name;
 
     int result;
 
@@ -226,8 +233,21 @@ void Camera::stopAcq()
                       << "status=" << getStatus() << ", " 
                       << "thread status=" << m_thread.getStatus();
 
-    m_thread.sendCmd(CameraThread::StopAcq);
-    m_thread.waitStatus(CameraThread::Idle);
+    if(m_thread.getStatus() != CameraThread::Error)
+    {
+        m_thread.sendCmd(CameraThread::StopAcq);
+
+        // Waiting for thread to finish
+        m_thread.waitStatus(CameraThread::Idle);
+    }
+    else
+    {
+        // aborting the thread
+        m_thread.abort();
+
+        // restart the thread
+        m_thread.start();
+    }
 }
 
 /************************************************************************

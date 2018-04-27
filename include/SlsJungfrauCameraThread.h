@@ -84,6 +84,9 @@ namespace lima
             // starts the thread
             virtual void start();
 
+            // aborts the thread
+            virtual void abort();
+
         private:
             // execute the start command
             void execStartAcq();
