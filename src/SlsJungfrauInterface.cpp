@@ -145,7 +145,7 @@ void Interface::getStatus(StatusType & status)
     DEB_MEMBER_FUNCT();
 
     HwInterface::StatusType::Basic hw_status;
-    Camera::Status                 camera_status = m_cam.getStatus();
+    Camera::Status camera_status = m_cam.getStatus();
     
     if(camera_status == Camera::Status::Idle)
     {

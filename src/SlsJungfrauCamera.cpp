@@ -44,18 +44,32 @@ using namespace lima::SlsJungfrau;
 /************************************************************************
  * \brief constructor
  * \param in_config_file_name complete path to the configuration file
+ * \param in_readout_time_sec readout time in seconds
  ************************************************************************/
-Camera::Camera(const std::string & in_config_file_name): m_thread(*this), m_frames_manager(*this)
+Camera::Camera(const std::string & in_config_file_name,
+               const double        in_readout_time_sec) : m_thread(*this), m_frames_manager(*this)
 {
     DEB_CONSTRUCTOR();
 
-    m_bit_depth     = 0;
-    m_max_width     = 0;
-    m_max_height    = 0;
-    m_width         = 0;
-    m_height        = 0;
-    m_exposure_time = 0.0;
-    m_latency_time  = 0.0;
+    m_bit_depth           = 0;
+    m_max_width           = 0;
+    m_max_height          = 0;
+    m_width               = 0; 
+    m_height              = 0;
+    m_exposure_time       = 0.0;
+    m_latency_time        = 0.0;
+    m_delay_after_trigger = 0.0;
+    m_threshold_energy_eV = 0.0;
+    m_status              = Camera::Idle; // important for the calls of updateTimes & updateTriggerData in the init method.
+
+    m_readout_time_sec    = in_readout_time_sec;
+    m_clock_divider       = Camera::FullSpeed;
+
+    m_detector_type             = "undefined";
+    m_detector_model            = "undefined";
+    m_detector_firmware_version = "undefined";
+    m_detector_software_version = "undefined";
+    m_module_firmware_version   = "undefined";
 
     init(in_config_file_name);
 }
@@ -123,6 +137,9 @@ void Camera::init(const std::string & in_config_file_name)
     // Setting the detector online
     m_detector_control->setOnline(slsDetectorDefs::ONLINE_FLAG);
 
+    // Connecting to the receiver
+    m_detector_control->setReceiverOnline(slsDetectorDefs::ONLINE_FLAG);
+
     // getting the bit depth of the camera
     m_bit_depth = m_detector_control->setBitDepth(SLS_GET_VALUE);
 
@@ -154,6 +171,13 @@ void Camera::init(const std::string & in_config_file_name)
     // initing the internal copies of trigger mode label, number of cyles, number of frames per cycle, number of frames
     updateTriggerData();
 
+    // initing some const data
+    // Module firmware version does not exist for Jungfrau
+    m_detector_type             = m_detector_control->getDetectorDeveloper();
+    m_detector_model            = m_detector_control->getDetectorType();
+    m_detector_firmware_version = convertVersionToString(m_detector_control->getDetectorFirmwareVersion());
+    m_detector_software_version = convertVersionToString(m_detector_control->getDetectorSoftwareVersion());
+
     // starting the acquisition thread
     m_thread.start();
 
@@ -170,8 +194,8 @@ void Camera::cleanSharedMemory()
 {
     DEB_MEMBER_FUNCT();
 
-    string cmd = "ipcs -m | grep -E '^0x000016[0-9a-z]{2}' | "
-                 "awk '{print $2}' | while read m; do ipcrm -m $m; done";
+    std::string cmd = "ipcs -m | grep -E '^0x000016[0-9a-z]{2}' | "
+                      "awk '{print $2}' | while read m; do ipcrm -m $m; done";
 
     std::system(cmd.c_str());
 }
@@ -305,7 +329,7 @@ void Camera::acquisitionDataReady(const int      in_receiver_index,
  * \brief returns the current camera status
  * \return current hardware status
  ************************************************************************/
-Camera::Status Camera::getStatus() const
+Camera::Status Camera::getStatus()
 {
     DEB_MEMBER_FUNCT();
 
@@ -379,7 +403,8 @@ Camera::Status Camera::getStatus() const
         }
     }
 
-    return result;
+    m_status = result;
+    return m_status;
 }
 
 //------------------------------------------------------------------
@@ -486,7 +511,7 @@ lima::ImageType Camera::getImageType() const
     lima::ImageType type;
 
     // getting the bit depth of the camera
-    int bit_depth = m_detector_control->setBitDepth(SLS_GET_VALUE);
+    int bit_depth = m_bit_depth;
 
     switch(bit_depth)
     {
@@ -554,10 +579,7 @@ void Camera::getPixelSize(double & out_x_size, double & out_y_size) const
 std::string Camera::getDetectorType() const
 {
     DEB_MEMBER_FUNCT();
-
-    // getting the detector type from the camera
-    std::string type = m_detector_control->getDetectorDeveloper();
-    return type;
+    return m_detector_type;
 }
 
 /*******************************************************************
@@ -567,10 +589,7 @@ std::string Camera::getDetectorType() const
 std::string Camera::getDetectorModel() const
 {
     DEB_MEMBER_FUNCT();
-
-    // getting the detector model from the camera (named type in sls sdk)
-    std::string model = m_detector_control->getDetectorType();
-    return model;
+    return m_detector_model;
 }
 
 /*******************************************************************
@@ -591,7 +610,7 @@ std::string Camera::convertVersionToString(int64_t in_version)
 std::string Camera::getModuleFirmwareVersion() const
 {
     DEB_MEMBER_FUNCT();
-    return "undefined"; //Module firmware version does not exist for Jungfrau
+    return m_module_firmware_version;
 }
 
 /*******************************************************************
@@ -601,7 +620,7 @@ std::string Camera::getModuleFirmwareVersion() const
 std::string Camera::getDetectorFirmwareVersion() const
 {
     DEB_MEMBER_FUNCT();
-    return convertVersionToString(m_detector_control->getDetectorFirmwareVersion());
+    return m_detector_firmware_version;
 }
 
 /*******************************************************************
@@ -611,7 +630,7 @@ std::string Camera::getDetectorFirmwareVersion() const
 std::string Camera::getDetectorSoftwareVersion() const
 {
     DEB_MEMBER_FUNCT();
-    return convertVersionToString(m_detector_control->getDetectorSoftwareVersion());
+    return m_detector_software_version;
 }
 
 //==================================================================
@@ -627,41 +646,47 @@ void Camera::updateTriggerData()
 {
     DEB_MEMBER_FUNCT();
 
-    // getting the current trigger mode index
-    int trigger_mode_index = m_detector_control->setTimingMode(SLS_GET_VALUE);
-
-    // converting trigger mode index to trigger mode label
-    m_trig_mode_label = slsDetectorUsers::getTimingMode(trigger_mode_index);
-    
-    // reading the number of frames per cycle
-    m_nb_frames_per_cycle = m_detector_control->setNumberOfFrames(SLS_GET_VALUE);
-
-    // reading the number of cycles
-    m_nb_cycles = m_detector_control->setNumberOfCycles(SLS_GET_VALUE);
-
-    // computing the number of frames
-    m_nb_frames = m_nb_cycles * m_nb_frames_per_cycle;
-
-    // computing the lima trigger mode
-    if(m_trig_mode_label == SLS_TRIGGER_MODE_AUTO)
+    // during acquisition, camera data access is not allowed because it
+    // could put the camera into an error state. 
+    // So we give the latest read value.
+    if(m_status == Camera::Idle)
     {
-        m_trig_mode = lima::TrigMode::IntTrig;
-    }
-    else
-    if(m_trig_mode_label == SLS_TRIGGER_MODE_TRIGGER)
-    {
-        if(m_nb_cycles == 1LL)
+        // getting the current trigger mode index
+        int trigger_mode_index = m_detector_control->setTimingMode(SLS_GET_VALUE);
+
+        // converting trigger mode index to trigger mode label
+        m_trig_mode_label = slsDetectorUsers::getTimingMode(trigger_mode_index);
+        
+        // reading the number of frames per cycle
+        m_nb_frames_per_cycle = m_detector_control->setNumberOfFrames(SLS_GET_VALUE);
+
+        // reading the number of cycles
+        m_nb_cycles = m_detector_control->setNumberOfCycles(SLS_GET_VALUE);
+
+        // computing the number of frames
+        m_nb_frames = m_nb_cycles * m_nb_frames_per_cycle;
+
+        // computing the lima trigger mode
+        if(m_trig_mode_label == SLS_TRIGGER_MODE_AUTO)
         {
-            m_trig_mode = lima::TrigMode::ExtTrigSingle;
+            m_trig_mode = lima::TrigMode::IntTrig;
+        }
+        else
+        if(m_trig_mode_label == SLS_TRIGGER_MODE_TRIGGER)
+        {
+            if(m_nb_cycles == 1LL)
+            {
+                m_trig_mode = lima::TrigMode::ExtTrigSingle;
+            }
+            else
+            {
+                m_trig_mode = lima::TrigMode::ExtTrigMult;
+            }
         }
         else
         {
-            m_trig_mode = lima::TrigMode::ExtTrigMult;
+            THROW_HW_ERROR(ErrorType::Error) << "updateTriggerData : This camera trigger Mode is not managed! (" << m_trig_mode_label << ")";
         }
-    }
-    else
-    {
-        THROW_HW_ERROR(ErrorType::Error) << "updateTriggerData : This camera trigger Mode is not managed! (" << m_trig_mode_label << ")";
     }
 }
 
@@ -763,14 +788,20 @@ void Camera::updateTimes()
 {
     DEB_MEMBER_FUNCT();
     
-    double exposure_period;
+    // during acquisition, camera data access is not allowed because it
+    // could put the camera into an error state. 
+    // So we give the latest read value.
+    if(m_status == Camera::Idle)
+    {
+        double exposure_period;
 
-    m_exposure_time = m_detector_control->setExposureTime  (SLS_GET_VALUE, true); // in seconds
-    exposure_period = m_detector_control->setExposurePeriod(SLS_GET_VALUE, true); // in seconds
+        m_exposure_time = m_detector_control->setExposureTime  (SLS_GET_VALUE, true); // in seconds
+        exposure_period = m_detector_control->setExposurePeriod(SLS_GET_VALUE, true); // in seconds
 
-    // compute latency time
-    // exposure period = exposure time + latency time
-    m_latency_time = exposure_period - m_exposure_time;
+        // compute latency time
+        // exposure period = exposure time + readout time + latency time
+        m_latency_time = exposure_period - m_exposure_time - m_readout_time_sec;
+    }
 }
 
 //------------------------------------------------------------------
@@ -804,8 +835,9 @@ void Camera::setExpTime(double in_exp_time)
     double exposure_period;
 
     // if we change the exposure time, we need to update also the exposure period
+    // exposure period = exposure time + readout time + latency time
     exposure_time   = m_detector_control->setExposureTime  (in_exp_time, true); // in seconds
-    exposure_period = m_detector_control->setExposurePeriod(exposure_time + m_latency_time, true); // in seconds
+    exposure_period = m_detector_control->setExposurePeriod(exposure_time + m_readout_time_sec + m_latency_time, true); // in seconds
 
     // updating the internal copies of exposure & latency times
     updateTimes();
@@ -838,7 +870,8 @@ void Camera::setLatencyTime(double in_latency_time)
     DEB_MEMBER_FUNCT();
     DEB_TRACE() << "Camera::setLatencyTime - " << DEB_VAR1(in_latency_time) << " (sec)";
 
-    m_detector_control->setExposurePeriod(m_exposure_time + in_latency_time, true); // in seconds
+    // exposure period = exposure time + readout time + latency time
+    m_detector_control->setExposurePeriod(m_exposure_time + m_readout_time_sec + in_latency_time, true); // in seconds
 
     // updating the internal copies of exposure & latency times
     updateTimes();
@@ -1094,17 +1127,23 @@ int Camera::getThresholdEnergy()
 {
     DEB_MEMBER_FUNCT();
 
-    int threshold_energy_eV;
-
-    threshold_energy_eV = m_detector_control->getThresholdEnergy();
-
-    if(threshold_energy_eV == slsDetectorDefs::FAIL)
+    // during acquisition, camera data access is not allowed because it
+    // could put the camera into an error state. 
+    // So we give the latest read value.
+    if(m_status == Camera::Idle)
     {
-        THROW_HW_ERROR(ErrorType::Error) << "getThresholdEnergy failed!";
+        int threshold_energy_eV = m_detector_control->getThresholdEnergy();
+
+        if(threshold_energy_eV == slsDetectorDefs::FAIL)
+        {
+            THROW_HW_ERROR(ErrorType::Error) << "getThresholdEnergy failed!";
+        }
+
+        m_threshold_energy_eV = threshold_energy_eV;
     }
 
-    DEB_RETURN() << DEB_VAR1(threshold_energy_eV);
-    return threshold_energy_eV;
+    DEB_RETURN() << DEB_VAR1(m_threshold_energy_eV);
+    return m_threshold_energy_eV;
 }
 
 /*******************************************************************
@@ -1132,10 +1171,17 @@ lima::SlsJungfrau::Camera::ClockDivider Camera::getClockDivider()
 {
     DEB_MEMBER_FUNCT();
 
-    int clock_divider = m_detector_control->setClockDivider(SLS_GET_VALUE);
+    // during acquisition, camera data access is not allowed because it
+    // could put the camera into an error state. 
+    // So we give the latest read value.
+    if(m_status == Camera::Idle)
+    {
+        int clock_divider = m_detector_control->setClockDivider(SLS_GET_VALUE);
+        m_clock_divider = static_cast<enum ClockDivider>(clock_divider);
+    }
 
-    DEB_RETURN() << DEB_VAR1(clock_divider);
-    return static_cast<enum ClockDivider>(clock_divider);
+    DEB_RETURN() << DEB_VAR1(m_clock_divider);
+    return m_clock_divider;
 }
 
 /*******************************************************************
@@ -1158,10 +1204,16 @@ double Camera::getDelayAfterTrigger()
 {
     DEB_MEMBER_FUNCT();
 
-    double delay_after_trigger = m_detector_control->setDelayAfterTrigger(SLS_GET_VALUE, true); // in seconds
+    // during acquisition, camera data access is not allowed because it
+    // could put the camera into an error state. 
+    // So we give the latest read value.
+    if(m_status == Camera::Idle)
+    {
+        m_delay_after_trigger = m_detector_control->setDelayAfterTrigger(SLS_GET_VALUE, true); // in seconds
+    }
 
-    DEB_RETURN() << DEB_VAR1(delay_after_trigger);
-    return delay_after_trigger;
+    DEB_RETURN() << DEB_VAR1(m_delay_after_trigger);
+    return m_delay_after_trigger;
 }
 
 /*******************************************************************

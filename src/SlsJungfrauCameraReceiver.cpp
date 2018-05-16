@@ -22,13 +22,14 @@
 
 /*************************************************************************************/
 /*! 
- *  \file   SlsJungfrauCameraReceiverInfo.h
+ *  \file   SlsJungfrauCameraReceiver.h
  *  \brief  SlsJungfrau receiver informations class implementation 
  *  \author Cédric Castel - SOLEIL (MEDIANE SYSTEME - IT consultant) 
 */
 /*************************************************************************************/
 
-#include "SlsJungfrauCameraReceiverInfo.h"
+#include "SlsJungfrauCameraReceiver.h"
+#include "SlsJungfrauCameraReceivers.h"
 
 #include <slsReceiverUsers.h>
 
@@ -37,18 +38,20 @@ using namespace lima::SlsJungfrau;
 /************************************************************************
  * \brief constructor without parameter
  ************************************************************************/
-CameraReceiverInfo::CameraReceiverInfo()
+CameraReceiver::CameraReceiver()
 {
-    m_receiver   = NULL;
-    m_host_name  = "undefined";
-    m_tcpip_port = 0;
+    m_host_name      = "undefined";
+    m_receiver       = NULL;
+    m_tcpip_port     = 0   ;
+    m_receivers      = NULL;
+    m_receiver_index = 0   ;
 }
 
 /************************************************************************
  * \brief gets the receiver
  * \return receiver smart pointer
  ************************************************************************/
-lima::AutoPtr<slsReceiverUsers > CameraReceiverInfo::getReceiver()
+lima::AutoPtr<slsReceiverUsers > CameraReceiver::getReceiver()
 {
     return m_receiver;
 }
@@ -57,7 +60,7 @@ lima::AutoPtr<slsReceiverUsers > CameraReceiverInfo::getReceiver()
  * \brief sets the receiver
  * \param in_receiver new receiver smart pointer
  ************************************************************************/
-void CameraReceiverInfo::setReceiver(lima::AutoPtr<slsReceiverUsers > in_receiver)
+void CameraReceiver::setReceiver(lima::AutoPtr<slsReceiverUsers > in_receiver)
 {
     m_receiver = in_receiver;
 }
@@ -66,7 +69,7 @@ void CameraReceiverInfo::setReceiver(lima::AutoPtr<slsReceiverUsers > in_receive
  * \brief gets the host name
  * \return host name value
  ************************************************************************/
-const std::string & CameraReceiverInfo::getHostName() const
+const std::string & CameraReceiver::getHostName() const
 {
     return m_host_name;
 }
@@ -75,7 +78,7 @@ const std::string & CameraReceiverInfo::getHostName() const
  * \brief sets the host name
  * \param in_host_name new host name value
  ************************************************************************/
-void CameraReceiverInfo::setHostName(const std::string & in_host_name)
+void CameraReceiver::setHostName(const std::string & in_host_name)
 {
     m_host_name = in_host_name;
 }
@@ -84,7 +87,7 @@ void CameraReceiverInfo::setHostName(const std::string & in_host_name)
  * \brief gets the tcpip port
  * \return tcpip port value
  ************************************************************************/
-int CameraReceiverInfo::getTcpipPort() const
+int CameraReceiver::getTcpipPort() const
 {
     return m_tcpip_port;
 }
@@ -93,9 +96,45 @@ int CameraReceiverInfo::getTcpipPort() const
  * \brief sets the tcpip port
  * \param in_tcpip_port new tcpip port value
  ************************************************************************/
-void CameraReceiverInfo::setTcpipPort(const int in_tcpip_port)
+void CameraReceiver::setTcpipPort(const int in_tcpip_port)
 {
     m_tcpip_port = in_tcpip_port;
+}
+
+/************************************************************************
+ * \brief gets the access to the CameraReceivers object 
+ * \return CameraReceivers smart pointer
+ ************************************************************************/
+lima::AutoPtr<CameraReceivers > CameraReceiver::getReceivers()
+{
+    return m_receivers;
+}
+
+/************************************************************************
+ * \brief sets the access to the CameraReceivers object
+ * \param in_receivers CameraReceivers smart pointer
+ ************************************************************************/
+void CameraReceiver::setReceivers(lima::AutoPtr<CameraReceivers > in_receivers)
+{
+    m_receivers = in_receivers;
+}
+
+/************************************************************************
+ * \brief gets the receiver index
+ * \return receiver index value
+ ************************************************************************/
+int CameraReceiver::getReceiverIndex() const
+{
+    return m_receiver_index;
+}
+
+/************************************************************************
+ * \brief sets the receiver index
+ * \param in_receiver_index new receiver index 
+ ************************************************************************/
+void CameraReceiver::setReceiverIndex(const int in_receiver_index)
+{
+    m_receiver_index = in_receiver_index;
 }
 
 //========================================================================================

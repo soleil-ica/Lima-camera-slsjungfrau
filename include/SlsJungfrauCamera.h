@@ -83,7 +83,8 @@ namespace lima
 
             //==================================================================
             // constructor
-            Camera(const std::string & in_config_file_name);
+            Camera(const std::string & in_config_file_name,
+                   const double        in_readout_time_sec);
 
             // destructor (no need to be virtual)
             ~Camera();
@@ -115,7 +116,8 @@ namespace lima
                 // status management
                 //------------------------------------------------------------------
                 // returns the current camera status
-                Camera::Status getStatus() const;
+                // can not be const because internal member is updated during the call
+                Camera::Status getStatus();
 
                 //------------------------------------------------------------------
                 // Acquired frames management
@@ -190,14 +192,14 @@ namespace lima
                 void setTrigMode(lima::TrigMode in_mode);
 
                 // Gets the trigger mode
-                // can not be const because internal member are updated during the call
+                // can not be const because internal members are updated during the call
                 lima::TrigMode getTrigMode();
 
                 //------------------------------------------------------------------
                 // exposure time management
                 //------------------------------------------------------------------
                 // Gets the exposure time
-                // can not be const because internal member are updated during the call
+                // can not be const because internal members are updated during the call
                 double getExpTime();
 
                 // Sets the exposure time
@@ -207,7 +209,7 @@ namespace lima
                 // latency time management
                 //------------------------------------------------------------------
                 // Gets the latency time
-                // can not be const because internal member are updated during the call
+                // can not be const because internal members are updated during the call
                 double getLatencyTime();
 
                 // Sets the latency time
@@ -220,7 +222,7 @@ namespace lima
                 void setNbFrames(int64_t in_nb_frames);
 
                 // Gets the number of frames
-                // can not be const because internal member are updated during the call
+                // can not be const because internal member is updated during the call
                 int64_t getNbFrames();
 
                 //------------------------------------------------------------------
@@ -367,6 +369,36 @@ namespace lima
 
             // number total of frames
             int64_t m_nb_frames;
+
+            // readout time in seconds
+            double m_readout_time_sec;
+
+            // detector type
+            std::string m_detector_type;
+
+            // detector model
+            std::string m_detector_model;
+
+            // detector firmware version
+            std::string m_detector_firmware_version;
+
+            // detector software version
+            std::string m_detector_software_version;
+
+            // module firmware version
+            std::string m_module_firmware_version;
+
+            // last known status
+            Camera::Status m_status;
+            
+            // delay after trigger in seconds
+            double m_delay_after_trigger;
+
+            // clock divider
+            Camera::ClockDivider m_clock_divider;
+
+            // treshold energy
+            int m_threshold_energy_eV; 
 
             //------------------------------------------------------------------
             // main acquisition thread
