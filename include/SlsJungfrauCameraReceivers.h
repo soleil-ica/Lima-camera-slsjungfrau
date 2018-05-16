@@ -37,8 +37,7 @@
 #include "lima/HwBufferMgr.h"
 #include <vector>
 
-#include "SlsJungfrauCameraReceiverInfo.h"
-#include "SlsJungfrauCameraReceiverUserData.h"
+#include "SlsJungfrauCameraReceiver.h"
 
 /**********************************************************************/
 // defines the SLS slsReceiverUsers class
@@ -79,16 +78,18 @@ namespace lima
                       lima::AutoPtr<CameraReceivers>   in_detector_receivers);
 
         private:
-            friend class CameraReceiverUserData;
+            friend class CameraReceiver;
 
-            // creates the receiver info container
-            void createReceiversInfo(const std::string & in_config_file_name);
+            // creates the receivers container
+            void createReceivers(const std::string           & in_config_file_name,
+                                 std::vector<CameraReceiver> & out_receivers      );
 
             // removes leading, trailing and extra spaces
             std::string trimString(const std::string & in_string) const;
 
-            // automatically resizes the receivers informations container 
-            void manageReceiversInfoResize(const size_t & in_element_index);
+            // automatically resizes the receivers container 
+            void manageReceiversResize(const size_t                & in_element_index,
+                                       std::vector<CameraReceiver> & in_out_receivers);
 
             // converts a string to an integer and checks the value.
             int convertStringToInteger(const std::string & in_value,
@@ -148,12 +149,10 @@ namespace lima
             // direct access to camera
             Camera & m_cam;
 
-            // config file receivers informations container
-            std::vector<CameraReceiverInfo> m_receivers_info; 
-
             // c-array which contains elements used as user data in sls sdk callbacks
             // I prefer to use a fixed container to get fixed pointers on the elements.
-            CameraReceiverUserData * m_receivers_user_data;
+            CameraReceiver * m_receivers   ;
+            size_t           m_nb_receivers;
         };
     }
 }

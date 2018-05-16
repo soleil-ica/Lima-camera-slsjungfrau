@@ -22,14 +22,14 @@
 
 /********************************************************************************/
 /*! 
- *  \file   SlsJungfrauCameraReceiverInfo.h
+ *  \file   SlsJungfrauCameraReceiver.h
  *  \brief  SlsJungfrau receiver informations class interface 
  *  \author Cédric Castel - SOLEIL (MEDIANE SYSTEME - IT consultant) 
 */
 /********************************************************************************/
 
-#ifndef SLSJUNGFRAUCAMERARECEIVERINFO_H
-#define SLSJUNGFRAUCAMERARECEIVERINFO_H
+#ifndef SLSJUNGFRAUCAMERARECEIVER_H
+#define SLSJUNGFRAUCAMERARECEIVER_H
 
 #include "lima/Debug.h"
 #include "lima/Constants.h"
@@ -44,22 +44,31 @@ namespace lima
 {
     namespace SlsJungfrau
     {
+        /**********************************************************************/
+        // pre-defines the CameraReceivers class for CameraReceiver friend links
+        class CameraReceivers;
+
         /***********************************************************************
-         * \class CameraReceiverInfo
+         * \class CameraReceiver
          * \brief used to store Receiver informations
          *
          * defines an info class used to store Receiver informations 
          * which were read from the configuration file.
+         *
+         * allows the callbacks :
+         * - to access to the CameraReceivers object
+         * - to know the receiver index which is not always given in
+         *   the callback data
          ***********************************************************************/
 
-        class CameraReceiverInfo
+        class CameraReceiver
         {
-            DEB_CLASS_NAMESPC(DebModCamera, "CameraReceiverInfo", "SlsJungfrau");
+            DEB_CLASS_NAMESPC(DebModCamera, "CameraReceiver", "SlsJungfrau");
 
         public:
             //==================================================================
             // constructor
-            CameraReceiverInfo();
+            CameraReceiver();
 
             //==================================================================
             // gets the receiver
@@ -80,13 +89,29 @@ namespace lima
             // sets the tcpip port
             void setTcpipPort(const int in_tcpip_port);
 
+            // gets the access to the CameraReceivers object 
+            lima::AutoPtr<CameraReceivers > getReceivers();
+
+            // sets the access to the CameraReceivers object
+            void setReceivers(lima::AutoPtr<CameraReceivers > in_receivers);
+
+            // gets the receiver index
+            int getReceiverIndex() const;
+
+            // sets the receiver index
+            void setReceiverIndex(const int in_receiver_index);
+            
         private:
-            lima::AutoPtr<slsReceiverUsers > m_receiver  ; // sls receiver instance from sls sdk
-            std::string                      m_host_name ; // receiver host name  (part of the hostname value in config file)
-            int                              m_tcpip_port; // receiver tcpip port (value of rx_tcpport in config file)
+            lima::AutoPtr<slsReceiverUsers > m_receiver      ; // sls receiver instance from sls sdk
+
+            std::string                      m_host_name     ; // receiver host name  (part of the hostname value in config file)
+            int                              m_tcpip_port    ; // receiver tcpip port (value of rx_tcpport in config file)
+
+            int                              m_receiver_index; // receiver index in m_receivers_info container
+            lima::AutoPtr<CameraReceivers>   m_receivers     ; // direct access to the CameraReceivers object
         }; 
     }
 }
-#endif // SLSJUNGFRAUCAMERARECEIVERINFO_H
+#endif // SLSJUNGFRAUCAMERARECEIVER_H
 
 /*************************************************************************/
