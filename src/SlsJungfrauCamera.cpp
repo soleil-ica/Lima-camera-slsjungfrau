@@ -51,6 +51,8 @@ Camera::Camera(const std::string & in_config_file_name,
 {
     DEB_CONSTRUCTOR();
 
+    m_detector_control    = NULL;
+    m_detector_receivers  = NULL;
     m_bit_depth           = 0;
     m_max_width           = 0;
     m_max_height          = 0;
@@ -85,10 +87,25 @@ Camera::~Camera()
     stopAcq();
 
     // releasing the detector control instance
-    m_detector_control = NULL;
+    DEB_TRACE() << "Camera::Camera - releasing the detector control instance";
+
+    if(m_detector_control != NULL)
+    {
+        m_detector_control->setReceiverOnline(slsDetectorDefs::OFFLINE_FLAG);
+        m_detector_control->setOnline(slsDetectorDefs::OFFLINE_FLAG);
+
+        delete m_detector_control;
+        m_detector_control = NULL;
+    }
 
     // releasing the controller class for detector receivers functionalities
-    m_detector_receivers = NULL;
+    DEB_TRACE() << "Camera::Camera - releasing the controller class for detector receivers functionalities";
+    
+    if(m_detector_receivers != NULL)
+    {
+        delete m_detector_receivers;
+        m_detector_receivers = NULL;
+    }
 }
 
 /************************************************************************
@@ -104,7 +121,7 @@ void Camera::init(const std::string & in_config_file_name)
     int result;
 
     // before, cleaning the shared memory
-    cleanSharedMemory();
+    // cleanSharedMemory();
 
     // initing the class attributes
     m_config_file_name = in_config_file_name;
@@ -114,12 +131,7 @@ void Camera::init(const std::string & in_config_file_name)
     m_detector_receivers = new CameraReceivers(*this);
 
     // creating the receivers (just one for Jungfrau)
-    // We need to pass CameraReceivers smart pointer to the init method
-    // because the sls callbacks are static and need to have access
-    // to the CameraReceivers instance. 
-    // The CameraReceivers class does not have access to the 
-    // smart pointer which contains it.
-    m_detector_receivers->init(m_config_file_name, m_detector_receivers);
+    m_detector_receivers->init(m_config_file_name);
 
     // creating the detector control instance
     int id = 0;
@@ -200,6 +212,15 @@ void Camera::cleanSharedMemory()
     std::system(cmd.c_str());
 }
 
+/************************************************************************
+ * \brief creates an autolock mutex for sdk methods access
+ ************************************************************************/
+lima::AutoMutex Camera::sdkLock()
+{
+    DEB_MEMBER_FUNCT();
+    return lima::AutoMutex(m_sdk_cond.mutex());
+}
+
 //==================================================================
 // Related to HwInterface
 //==================================================================
@@ -252,19 +273,16 @@ void Camera::stopAcq()
 
 	DEB_TRACE() << "executing StopAcq command...";
 
-    if((getStatus() != Camera::Waiting) && (getStatus() != Camera::Running))
-    	DEB_WARNING() << "Execute a stop acq command but not in [Waiting,Running] status. " 
-                      << "status=" << getStatus() << ", " 
-                      << "thread status=" << m_thread.getStatus();
-
     if(m_thread.getStatus() != CameraThread::Error)
     {
-        m_thread.sendCmd(CameraThread::StopAcq);
+        m_thread.execStopAcq();
 
-        // Waiting for thread to finish
-        m_thread.waitStatus(CameraThread::Idle);
+        // Waiting for thread to finish or to be in error
+        m_thread.waitNotStatus(CameraThread::Running);
     }
-    else
+
+    // thread in error
+    if(m_thread.getStatus() == CameraThread::Error)
     {
         // aborting the thread
         m_thread.abort();
@@ -322,9 +340,133 @@ void Camera::acquisitionDataReady(const int      in_receiver_index,
     }
 }
 
+/************************************************************************
+ * \brief start receiver listening mode
+ * \return OK or FAIL
+ ************************************************************************/
+int Camera::startReceiver()
+{
+    // protecting the sdk concurrent access
+    lima::AutoMutex sdk_mutex = sdkLock(); 
+
+    return m_detector_control->startReceiver();
+}
+
+/************************************************************************
+ * \brief stop receiver listening mode
+ * \return OK or FAIL
+ ************************************************************************/
+int Camera::stopReceiver()
+{
+    // protecting the sdk concurrent access
+    lima::AutoMutex sdk_mutex = sdkLock(); 
+
+    return m_detector_control->stopReceiver();
+}
+
+/************************************************************************
+ * \brief start detector real time acquisition in non blocking mode
+ * \return OK if all detectors are properly started, FAIL otherwise
+ ************************************************************************/
+int Camera::startAcquisition()
+{
+    // protecting the sdk concurrent access
+    lima::AutoMutex sdk_mutex = sdkLock(); 
+
+    return m_detector_control->startAcquisition();
+}
+
+/************************************************************************
+ * \brief stop detector real time acquisition
+ * \return OK if all detectors are properly stopped, FAIL otherwise
+ ************************************************************************/
+int Camera::stopAcquisition()
+{
+    // protecting the sdk concurrent access
+    lima::AutoMutex sdk_mutex = sdkLock(); 
+
+    return m_detector_control->stopAcquisition();
+}
+
 //------------------------------------------------------------------
 // status management
 //------------------------------------------------------------------
+/************************************************************************
+ * \brief returns the current detector status
+ * \return current hardware status
+ ************************************************************************/
+Camera::Status Camera::getDetectorStatus()
+{
+    DEB_MEMBER_FUNCT();
+
+    // protecting the sdk concurrent access
+    lima::AutoMutex sdk_mutex = sdkLock(); 
+
+    Camera::Status result;
+
+    // In auto mode:
+    // Detector starts with idle to running and at end of acquisition, returns to idle.
+    //
+    // In trigger mode:
+    // Detector starts with idle to waiting and stays in waiting until it gets a trigger.
+    // Upon trigger, it switches to running and goes back to waiting again until it gets a trigger.
+    // Upon end of acquisition (after it get n triggers and m frames as configured), it will go to idle.
+    //
+    // If one explicitly calls stop acquisition:
+    // Detectors goes from running to idle.
+    //
+    // If there is fifo overflow:
+    // the detector will go to stopped state and stay there until the fifos are cleared.
+    // It should be concidered as an error.    
+
+    // getting the detector status
+    int status = m_detector_control->getDetectorStatus();
+
+    // ready to start acquisition
+    if(status == slsDetectorDefs::runStatus::IDLE)
+    {
+        result = Camera::Idle;
+    }
+    else
+    // waiting for trigger or gate signal 
+    if(status == slsDetectorDefs::runStatus::WAITING)
+    {
+        result = Camera::Waiting;
+    }
+    else
+    // acquisition is running 
+    if(status == slsDetectorDefs::runStatus::RUNNING)
+    {
+        result = Camera::Running;
+    }
+    else
+    // acquisition stopped externally, fifo full or unexpected error 
+    if((status == slsDetectorDefs::runStatus::ERROR  ) ||
+       (status == slsDetectorDefs::runStatus::STOPPED))
+    {
+        result = Camera::Error;
+    }
+    else
+    // these states do not apply to Jungfrau
+    // RUN_FINISHED : acquisition not running but data in memory 
+    // TRANSMITTING : acquisition running and data in memory 
+    if((status == slsDetectorDefs::runStatus::RUN_FINISHED) ||
+       (status == slsDetectorDefs::runStatus::TRANSMITTING))
+    {
+        THROW_HW_ERROR(ErrorType::Error) << "Camera::getStatus failed! An unexpected state was returned!";
+    }
+    else
+    // impossible state 
+    {
+        THROW_HW_ERROR(ErrorType::Error) << "Camera::getStatus failed! An unknown state was returned!";
+    }
+
+    // making a copy of the latest read status
+    m_status = result;
+
+    return result;
+}
+
 /************************************************************************
  * \brief returns the current camera status
  * \return current hardware status
@@ -338,73 +480,26 @@ Camera::Status Camera::getStatus()
     int thread_status = m_thread.getStatus();
 
     // error during the acquisition management ?
+    // the device becomes in error state.
     if(thread_status == CameraThread::Error)
     {
         result = Camera::Error;
     }
     else
-    // using the hardware camera status
+    // the device is in acquisition.
+    // During an aquisition, this is the acquisition thread which read the hardware camera status.
+    // So we use the latest read camera status.
+    if(thread_status == CameraThread::Running)
     {
-        // In auto mode:
-        // Detector starts with idle to running and at end of acquisition, returns to idle.
-        //
-        // In trigger mode:
-        // Detector starts with idle to waiting and stays in waiting until it gets a trigger.
-        // Upon trigger, it switches to running and goes back to waiting again until it gets a trigger.
-        // Upon end of acquisition (after it get n triggers and m frames as configured), it will go to idle.
-        //
-        // If one explicitly calls stop acquisition:
-        // Detectors goes from running to idle.
-        //
-        // If there is fifo overflow:
-        // the detector will go to stopped state and stay there until the fifos are cleared.
-        // It should be concidered as an error.    
-
-        // getting the detector status
-        int status = m_detector_control->getDetectorStatus();
-
-        // ready to start acquisition
-        if(status == slsDetectorDefs::runStatus::IDLE)
-        {
-            result = Camera::Idle;
-        }
-        else
-        // waiting for trigger or gate signal 
-        if(status == slsDetectorDefs::runStatus::WAITING)
-        {
-            result = Camera::Waiting;
-        }
-        else
-        // acquisition is running 
-        if(status == slsDetectorDefs::runStatus::RUNNING)
-        {
-            result = Camera::Running;
-        }
-        else
-        // acquisition stopped externally, fifo full or unexpected error 
-        if((status == slsDetectorDefs::runStatus::ERROR  ) ||
-           (status == slsDetectorDefs::runStatus::STOPPED))
-        {
-            result = Camera::Error;
-        }
-        else
-        // these states do not apply to Jungfrau
-        // RUN_FINISHED : acquisition not running but data in memory 
-        // TRANSMITTING : acquisition running and data in memory 
-        if((status == slsDetectorDefs::runStatus::RUN_FINISHED) ||
-           (status == slsDetectorDefs::runStatus::TRANSMITTING))
-        {
-            THROW_HW_ERROR(ErrorType::Error) << "Camera::getStatus failed! An unexpected state was returned!";
-        }
-        else
-        // impossible state 
-        {
-            THROW_HW_ERROR(ErrorType::Error) << "Camera::getStatus failed! An unknown state was returned!";
-        }
+        result = m_status;
+    }
+    else
+    // the device is not in acquisition or in error, so we can read the hardware camera status
+    {
+        result = getDetectorStatus();
     }
 
-    m_status = result;
-    return m_status;
+    return result;
 }
 
 //------------------------------------------------------------------
@@ -420,6 +515,20 @@ uint64_t Camera::getNbAcquiredFrames() const
 
     // reading in the number of treated frames in the frame manager
     return m_frames_manager.getNbTreatedFrames();
+}
+
+/************************************************************************
+ * \brief get the number of frames in the containers
+ * \return the number of frames by type
+ ************************************************************************/
+void Camera::getNbFrames(size_t & out_received, 
+                         size_t & out_complete,
+                         size_t & out_treated ) const
+{
+    DEB_MEMBER_FUNCT();
+
+    // reading in the number of frames in the frame manager
+    m_frames_manager.getNbFrames(out_received, out_complete, out_treated);
 }
 
 /*******************************************************************
@@ -548,8 +657,13 @@ void Camera::setImageType(lima::ImageType in_type)
             break;
     }
 
-    // setting the bit depth of the camera
-    m_detector_control->setBitDepth(bit_depth);
+    // protecting the sdk concurrent access
+    {
+        lima::AutoMutex sdk_mutex = sdkLock(); 
+
+        // setting the bit depth of the camera
+        m_detector_control->setBitDepth(bit_depth);
+    }
 
     // store the value in a class variable
     m_bit_depth = bit_depth;
@@ -651,17 +765,22 @@ void Camera::updateTriggerData()
     // So we give the latest read value.
     if(m_status == Camera::Idle)
     {
-        // getting the current trigger mode index
-        int trigger_mode_index = m_detector_control->setTimingMode(SLS_GET_VALUE);
+        // protecting the sdk concurrent access
+        {
+            lima::AutoMutex sdk_mutex = sdkLock(); 
 
-        // converting trigger mode index to trigger mode label
-        m_trig_mode_label = slsDetectorUsers::getTimingMode(trigger_mode_index);
-        
-        // reading the number of frames per cycle
-        m_nb_frames_per_cycle = m_detector_control->setNumberOfFrames(SLS_GET_VALUE);
+            // getting the current trigger mode index
+            int trigger_mode_index = m_detector_control->setTimingMode(SLS_GET_VALUE);
 
-        // reading the number of cycles
-        m_nb_cycles = m_detector_control->setNumberOfCycles(SLS_GET_VALUE);
+            // converting trigger mode index to trigger mode label
+            m_trig_mode_label = slsDetectorUsers::getTimingMode(trigger_mode_index);
+            
+            // reading the number of frames per cycle
+            m_nb_frames_per_cycle = m_detector_control->setNumberOfFrames(SLS_GET_VALUE);
+
+            // reading the number of cycles
+            m_nb_cycles = m_detector_control->setNumberOfCycles(SLS_GET_VALUE);
+        }
 
         // computing the number of frames
         m_nb_frames = m_nb_cycles * m_nb_frames_per_cycle;
@@ -748,16 +867,21 @@ void Camera::setTrigMode(lima::TrigMode in_mode)
             break;
     }
 
-    // initing the number of frames per cycle and  number of cycles 
-    // to avoid problems during the trigger mode change.
-    m_nb_frames_per_cycle = m_detector_control->setNumberOfFrames(1);
-    m_nb_cycles           = m_detector_control->setNumberOfCycles(1);
+    // protecting the sdk concurrent access
+    {
+        lima::AutoMutex sdk_mutex = sdkLock(); 
 
-    // conversion of trigger mode label to trigger mode index
-    int trigger_mode_index = slsDetectorUsers::getTimingMode(trig_mode);
+        // initing the number of frames per cycle and  number of cycles 
+        // to avoid problems during the trigger mode change.
+        m_nb_frames_per_cycle = m_detector_control->setNumberOfFrames(1);
+        m_nb_cycles           = m_detector_control->setNumberOfCycles(1);
 
-    // apply the trigger change
-    m_detector_control->setTimingMode(trigger_mode_index);
+        // conversion of trigger mode label to trigger mode index
+        int trigger_mode_index = slsDetectorUsers::getTimingMode(trig_mode);
+
+        // apply the trigger change
+        m_detector_control->setTimingMode(trigger_mode_index);
+    }
 
     // reseting the number of frames to its old value to 
     // correctly set the nb frames per cycle and the number of cycles
@@ -795,8 +919,13 @@ void Camera::updateTimes()
     {
         double exposure_period;
 
-        m_exposure_time = m_detector_control->setExposureTime  (SLS_GET_VALUE, true); // in seconds
-        exposure_period = m_detector_control->setExposurePeriod(SLS_GET_VALUE, true); // in seconds
+        // protecting the sdk concurrent access
+        {
+            lima::AutoMutex sdk_mutex = sdkLock(); 
+
+            m_exposure_time = m_detector_control->setExposureTime  (SLS_GET_VALUE, true); // in seconds
+            exposure_period = m_detector_control->setExposurePeriod(SLS_GET_VALUE, true); // in seconds
+        }
 
         // compute latency time
         // exposure period = exposure time + readout time + latency time
@@ -834,10 +963,15 @@ void Camera::setExpTime(double in_exp_time)
     double exposure_time  ;
     double exposure_period;
 
-    // if we change the exposure time, we need to update also the exposure period
-    // exposure period = exposure time + readout time + latency time
-    exposure_time   = m_detector_control->setExposureTime  (in_exp_time, true); // in seconds
-    exposure_period = m_detector_control->setExposurePeriod(exposure_time + m_readout_time_sec + m_latency_time, true); // in seconds
+    // protecting the sdk concurrent access
+    {
+        lima::AutoMutex sdk_mutex = sdkLock(); 
+
+        // if we change the exposure time, we need to update also the exposure period
+        // exposure period = exposure time + readout time + latency time
+        exposure_time   = m_detector_control->setExposureTime  (in_exp_time, true); // in seconds
+        exposure_period = m_detector_control->setExposurePeriod(exposure_time + m_readout_time_sec + m_latency_time, true); // in seconds
+    }
 
     // updating the internal copies of exposure & latency times
     updateTimes();
@@ -870,8 +1004,13 @@ void Camera::setLatencyTime(double in_latency_time)
     DEB_MEMBER_FUNCT();
     DEB_TRACE() << "Camera::setLatencyTime - " << DEB_VAR1(in_latency_time) << " (sec)";
 
-    // exposure period = exposure time + readout time + latency time
-    m_detector_control->setExposurePeriod(m_exposure_time + m_readout_time_sec + in_latency_time, true); // in seconds
+    // protecting the sdk concurrent access
+    {
+        lima::AutoMutex sdk_mutex = sdkLock(); 
+
+        // exposure period = exposure time + readout time + latency time
+        m_detector_control->setExposurePeriod(m_exposure_time + m_readout_time_sec + in_latency_time, true); // in seconds
+    }
 
     // updating the internal copies of exposure & latency times
     updateTimes();
@@ -918,11 +1057,16 @@ void Camera::setNbFrames(int64_t in_nb_frames)
             break;
     }
 
-    // setting the number of cycles
-    m_nb_cycles = m_detector_control->setNumberOfCycles(nb_cycles);
+    // protecting the sdk concurrent access
+    {
+        lima::AutoMutex sdk_mutex = sdkLock(); 
 
-    // setting the number of frames per cycle
-    m_nb_frames_per_cycle = m_detector_control->setNumberOfFrames(nb_frames_per_cycle);
+        // setting the number of cycles
+        m_nb_cycles = m_detector_control->setNumberOfCycles(nb_cycles);
+
+        // setting the number of frames per cycle
+        m_nb_frames_per_cycle = m_detector_control->setNumberOfFrames(nb_frames_per_cycle);
+    }
 
     // updating the internal copies of trigger mode label, number of cyles, number of frames per cycle, number of frames
     updateTriggerData();
@@ -1080,6 +1224,9 @@ std::string Camera::setCmd(const std::string & in_command)
 
     if(argc > 0)
     {
+        // protecting the sdk concurrent access
+        lima::AutoMutex sdk_mutex = sdkLock(); 
+
         result = m_detector_control->putCommand(argc, argv);
     }
 
@@ -1107,6 +1254,9 @@ std::string Camera::getCmd(const std::string & in_command)
 
     if(argc > 0)
     {
+        // protecting the sdk concurrent access
+        lima::AutoMutex sdk_mutex = sdkLock(); 
+
         result = m_detector_control->getCommand(argc, argv);
     }
 
@@ -1132,7 +1282,14 @@ int Camera::getThresholdEnergy()
     // So we give the latest read value.
     if(m_status == Camera::Idle)
     {
-        int threshold_energy_eV = m_detector_control->getThresholdEnergy();
+        int threshold_energy_eV;
+
+        // protecting the sdk concurrent access
+        {
+            lima::AutoMutex sdk_mutex = sdkLock(); 
+
+            threshold_energy_eV = m_detector_control->getThresholdEnergy();
+        }
 
         if(threshold_energy_eV == slsDetectorDefs::FAIL)
         {
@@ -1155,7 +1312,14 @@ void Camera::setThresholdEnergy(int in_threshold_energy_eV)
     DEB_MEMBER_FUNCT();
     DEB_TRACE() << "Camera::setThresholdEnergy - " << DEB_VAR1(in_threshold_energy_eV) << " (eV)";
 
-    int result = m_detector_control->setThresholdEnergy(in_threshold_energy_eV);
+    int result;
+
+    // protecting the sdk concurrent access
+    {
+        lima::AutoMutex sdk_mutex = sdkLock(); 
+
+        result = m_detector_control->setThresholdEnergy(in_threshold_energy_eV);
+    }
 
     if(result == slsDetectorDefs::FAIL)
     {
@@ -1176,7 +1340,15 @@ lima::SlsJungfrau::Camera::ClockDivider Camera::getClockDivider()
     // So we give the latest read value.
     if(m_status == Camera::Idle)
     {
-        int clock_divider = m_detector_control->setClockDivider(SLS_GET_VALUE);
+        int clock_divider;
+
+        // protecting the sdk concurrent access
+        {
+            lima::AutoMutex sdk_mutex = sdkLock(); 
+            
+            clock_divider = m_detector_control->setClockDivider(SLS_GET_VALUE);
+        }
+
         m_clock_divider = static_cast<enum ClockDivider>(clock_divider);
     }
 
@@ -1192,6 +1364,9 @@ void Camera::setClockDivider(lima::SlsJungfrau::Camera::ClockDivider in_clock_di
 {
     DEB_MEMBER_FUNCT();
     DEB_TRACE() << "Camera::setClockDivider - " << DEB_VAR1(in_clock_divider);
+
+    // protecting the sdk concurrent access
+    lima::AutoMutex sdk_mutex = sdkLock(); 
 
     m_detector_control->setClockDivider(static_cast<int>(in_clock_divider));
 }
@@ -1209,6 +1384,9 @@ double Camera::getDelayAfterTrigger()
     // So we give the latest read value.
     if(m_status == Camera::Idle)
     {
+        // protecting the sdk concurrent access
+        lima::AutoMutex sdk_mutex = sdkLock(); 
+
         m_delay_after_trigger = m_detector_control->setDelayAfterTrigger(SLS_GET_VALUE, true); // in seconds
     }
 
@@ -1224,6 +1402,9 @@ void Camera::setDelayAfterTrigger(double in_delay_after_trigger)
 {
     DEB_MEMBER_FUNCT();
     DEB_TRACE() << "Camera::setDelayAfterTrigger - " << DEB_VAR1(in_delay_after_trigger) << " (sec)";
+
+    // protecting the sdk concurrent access
+    lima::AutoMutex sdk_mutex = sdkLock(); 
 
     m_detector_control->setDelayAfterTrigger(in_delay_after_trigger, true); // in seconds
 }

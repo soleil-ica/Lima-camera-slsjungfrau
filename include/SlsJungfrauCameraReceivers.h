@@ -71,11 +71,7 @@ namespace lima
             ~CameraReceivers();
 
             // inits the receivers using the configuration file name
-            // in_detector_receivers is used to set the callback user data.
-            // as the CameraReceivers in already managed by a shared pointer
-            // we can not use *this* to set the callbacks.
-            void init(const std::string              & in_config_file_name  ,
-                      lima::AutoPtr<CameraReceivers>   in_detector_receivers);
+            void init(const std::string & in_config_file_name);
 
         private:
             friend class CameraReceiver;

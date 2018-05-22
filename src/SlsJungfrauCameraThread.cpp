@@ -101,15 +101,8 @@ void CameraThread::execCmd(int cmd)
         switch (cmd)
         {
             case CameraThread::StartAcq:
-                if (status != CameraThread::Idle)
-                    throw LIMA_HW_EXC(InvalidValue, "Not Ready to StartAcq");
-                execStartAcq();
-                break;
-
-            case CameraThread::StopAcq:
-                if (status != CameraThread::Running)
-                    throw LIMA_HW_EXC(InvalidValue, "Not Ready to StopAcq");
-                execStopAcq();
+                if (status == CameraThread::Idle)
+                    execStartAcq();
                 break;
 
             default:
@@ -119,6 +112,7 @@ void CameraThread::execCmd(int cmd)
     catch (...)
     {
     }
+
     DEB_TRACE() << "CameraThread::execCmd - END";
 }
 
@@ -128,7 +122,11 @@ void CameraThread::execCmd(int cmd)
 void CameraThread::execStopAcq()
 {
     DEB_MEMBER_FUNCT();
-    m_force_stop = true;
+
+    int status = getStatus();
+
+    if (status == CameraThread::Running)
+        m_force_stop = true;
 }
 
 /************************************************************************
@@ -139,6 +137,8 @@ void CameraThread::execStartAcq()
     DEB_MEMBER_FUNCT();
     DEB_TRACE() << "executing StartAcq command...";
 
+    const double sleep_time_sec = 0.5; // sleep the tread in seconds
+
     m_force_stop = false;
 
     // the tread is running a new acquisition
@@ -147,11 +147,8 @@ void CameraThread::execStartAcq()
     // making an alias on buffer manager
     StdBufferCbMgr & buffer_mgr = m_cam.m_buffer_ctrl_obj.getBuffer();
 
-    // getting an alias on the detector control instance
-    lima::AutoPtr<slsDetectorUsers> detector_control = m_cam.m_detector_control;
-
     // starting receiver listening mode
-    if(detector_control->startReceiver() == slsDetectorDefs::FAIL)
+    if(m_cam.startReceiver() == slsDetectorDefs::FAIL)
     {
         setStatus(CameraThread::Error);
 
@@ -162,9 +159,9 @@ void CameraThread::execStartAcq()
 
     // starting real time acquisition in non blocking mode
     // returns OK if all detectors are properly started, FAIL otherwise
-    if(detector_control->startAcquisition() == slsDetectorDefs::FAIL)
+    if(m_cam.startAcquisition() == slsDetectorDefs::FAIL)
     {
-        detector_control->stopReceiver();
+        m_cam.stopReceiver();
 
         setStatus(CameraThread::Error);
 
@@ -178,7 +175,7 @@ void CameraThread::execStartAcq()
     buffer_mgr.setStartTimestamp(start_timestamp);
 
     // Main acquisition loop
-    // m_force_stop can be set to true by the StopAcq command to abort an acquisition
+    // m_force_stop can be set to true by the execStopAcq call to abort an acquisition
     // m_force_stop can be set to true also with an error hardware camera status
     // the loop can also end if the number of 
     while ((!m_force_stop)&&(m_cam.getNbAcquiredFrames() < m_cam.getInternalNbFrames()))
@@ -205,7 +202,7 @@ void CameraThread::execStartAcq()
         }
 
         // checking if the hardware acquisition is running and if there is no more frame to treat in the containers
-        Camera::Status status = m_cam.getStatus();
+        Camera::Status status = m_cam.getDetectorStatus();
 
         if((status != Camera::Waiting) && 
            (status != Camera::Running) &&
@@ -215,22 +212,22 @@ void CameraThread::execStartAcq()
             break;
         }
         
-        lima::Sleep(0.5); // sleep the tread in seconds
+        lima::Sleep(sleep_time_sec); // sleep the tread in seconds
     }
 
     // acquisition was aborted
     if(m_force_stop)
     {
-        Camera::Status status = m_cam.getStatus();
+        Camera::Status status = m_cam.getDetectorStatus();
 
         // checking if the hardware acquisition is running
         if((status == Camera::Waiting) || 
            (status == Camera::Running))
         {
             // stop detector acquisition
-            if(detector_control->stopAcquisition() == slsDetectorDefs::FAIL)
+            if(m_cam.stopAcquisition() == slsDetectorDefs::FAIL)
             {
-                detector_control->stopReceiver(); // try to stop receiver listening mode
+                m_cam.stopReceiver(); // try to stop receiver listening mode
 
                 setStatus(CameraThread::Error);
 
@@ -245,39 +242,47 @@ void CameraThread::execStartAcq()
     if(m_cam.getNbAcquiredFrames() < m_cam.getInternalNbFrames())
     {
         // stop detector acquisition
-        if(detector_control->stopAcquisition() == slsDetectorDefs::FAIL)
+        if(m_cam.stopAcquisition() == slsDetectorDefs::FAIL)
         {
-            detector_control->stopReceiver(); // try to stop receiver listening mode
+            m_cam.stopReceiver(); // try to stop receiver listening mode
 
             setStatus(CameraThread::Error);
+
+            size_t received;
+            size_t complete;
+            size_t treated ;
+            
+            m_cam.getNbFrames(received, complete, treated );
+
+            DEB_TRACE() << "frames received (" << received << ")";
+            DEB_TRACE() << "frames complete (" << complete << ")";
+            DEB_TRACE() << "frames treated ("  << treated  << ")";
 
             std::string errorText = "CameraThread::execStartAcq - lost packets during real time acquisition!";
             REPORT_EVENT(errorText);
             return;
         }
     }
-    else
-    // waiting for an idle hardware status
-    {
-        for(;;)
-        {
-            Camera::Status status = m_cam.getStatus();
 
-            // checking if the hardware acquisition is running
-            if((status != Camera::Waiting) && 
-               (status != Camera::Running))
-            {
-                break;
-            }
-            else
-            {
-                lima::Sleep(0.5); // sleep the tread in seconds
-            }
+    // waiting for an idle hardware status
+    for(;;)
+    {
+        Camera::Status status = m_cam.getDetectorStatus();
+
+        // checking if the hardware acquisition is running
+        if((status != Camera::Waiting) && 
+           (status != Camera::Running))
+        {
+            break;
+        }
+        else
+        {
+            lima::Sleep(sleep_time_sec); // sleep the tread in seconds
         }
     }
 
     // stopping receiver listening mode
-    if(detector_control->stopReceiver() == slsDetectorDefs::FAIL)
+    if(m_cam.stopReceiver() == slsDetectorDefs::FAIL)
     {
         setStatus(CameraThread::Error);
 

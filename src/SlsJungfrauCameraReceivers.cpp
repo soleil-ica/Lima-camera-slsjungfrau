@@ -65,21 +65,23 @@ CameraReceivers::~CameraReceivers()
 {
     DEB_DESTRUCTOR();
 
+    DEB_TRACE() << "CameraReceivers::~CameraReceivers - BEGIN";
+
     // c-array which contains elements used as user data in sls sdk callbacks
     if(m_receivers != NULL)
     {
         delete [] m_receivers;
         m_receivers = NULL;
     }
+
+    DEB_TRACE() << "CameraReceivers::~CameraReceivers - END";
 }
 
 /************************************************************************
  * \brief inits the receivers using the configuration file name
  * \param in_config_file_name complete path to the configuration file
- * \param in_detector_receivers used to set the callback user data
  ************************************************************************/
-void CameraReceivers::init(const std::string              & in_config_file_name  ,
-                           lima::AutoPtr<CameraReceivers>   in_detector_receivers)
+void CameraReceivers::init(const std::string & in_config_file_name)
 {
     DEB_MEMBER_FUNCT();
 
@@ -110,13 +112,13 @@ void CameraReceivers::init(const std::string              & in_config_file_name 
                     << receivers[receiver_index].getHostName() << " - "
                     << "tcpip port (" << receivers[receiver_index].getTcpipPort() << ")";
 
-        lima::AutoPtr<slsReceiverUsers > receiver = new slsReceiverUsers(argc, args, ret);
+        slsReceiverUsers * receiver = new slsReceiverUsers(argc, args, ret);
 
         // managing a failed result
         if(ret == slsReceiverDefs::FAIL)
         {
             // free the memory
-            receiver = NULL;
+            delete receiver;
 
             THROW_HW_FATAL(ErrorType::Error) << "CameraReceivers::init failed! " 
                                              << "Could not create the sls receiver (" 
@@ -129,7 +131,7 @@ void CameraReceivers::init(const std::string              & in_config_file_name 
             // in case of success, we set the receiver in the receivers informations container
             receivers[receiver_index].setReceiver     (receiver);
             receivers[receiver_index].setReceiverIndex(receiver_index);
-            receivers[receiver_index].setReceivers    (in_detector_receivers); // smart pointer copy
+            receivers[receiver_index].setReceivers    (this);
         }
     }
 
@@ -142,6 +144,7 @@ void CameraReceivers::init(const std::string              & in_config_file_name 
     for(receiver_index = 0 ; receiver_index < m_nb_receivers ; receiver_index++)
     {
         m_receivers[receiver_index] = receivers[receiver_index];
+        receivers[receiver_index].setReceiver(NULL);
     }
 
     receivers.clear(); // no need to keep the container content
@@ -149,7 +152,7 @@ void CameraReceivers::init(const std::string              & in_config_file_name 
     // setting the callbacks for the receivers
     for(receiver_index = 0 ; receiver_index < m_nb_receivers ; receiver_index++)
     {
-        lima::AutoPtr<slsReceiverUsers > receiver = m_receivers[receiver_index].getReceiver(); // alias
+        slsReceiverUsers * receiver = m_receivers[receiver_index].getReceiver(); // alias
 
         DEB_TRACE() << "registering the receiver " << "(" << receiver_index << ") callbacks:";
 
@@ -173,12 +176,13 @@ void CameraReceivers::init(const std::string              & in_config_file_name 
     // starting the receivers
     for(receiver_index = 0 ; receiver_index < m_nb_receivers ; receiver_index++)
     {
-        lima::AutoPtr<slsReceiverUsers > receiver = m_receivers[receiver_index].getReceiver(); // alias
+        slsReceiverUsers * receiver = m_receivers[receiver_index].getReceiver(); // alias
 
         if (receiver->start() == slsReceiverDefs::FAIL)
         {
             // free the memory
-            receiver = NULL;
+            delete receiver;
+            m_receivers[receiver_index].setReceiver(NULL);
 
             THROW_HW_FATAL(ErrorType::Error) << "CameraReceivers::init failed! " 
                                              << "Could not start the sls receiver (" 
