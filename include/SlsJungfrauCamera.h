@@ -125,6 +125,11 @@ namespace lima
                 // Gets the number of acquired frames
                 uint64_t getNbAcquiredFrames() const;
 
+                // get the number of frames in the containers
+                void getNbFrames(size_t & out_received, 
+                                 size_t & out_complete,
+                                 size_t & out_treated ) const;
+
             //==================================================================
             // Related to HwDetInfoCtrlObj
             //==================================================================
@@ -286,6 +291,9 @@ namespace lima
                 // cleans the shared memory used by the camera
                 void cleanSharedMemory();
 
+                // creates an autolock mutex for sdk methods access
+                lima::AutoMutex sdkLock();
+
                 // Updates exposure & latency times using camera data 
                 void updateTimes();
 
@@ -309,6 +317,27 @@ namespace lima
                 // Gets the frame manager access
                 CameraFrames & getFrameManager();
 
+            //------------------------------------------------------------------
+            // acquisition management
+            //------------------------------------------------------------------
+                // start receiver listening mode
+                int startReceiver();
+
+                // stop receiver listening mode
+                int stopReceiver();
+
+                // start detector real time acquisition in non blocking mode
+                int startAcquisition();
+
+                // stop detector real time acquisition
+                int stopAcquisition();
+
+            //------------------------------------------------------------------
+            // status management
+            //------------------------------------------------------------------
+                // returns the current detector status
+                Camera::Status getDetectorStatus();
+
         private:
             friend class CameraThread; // for getFrameManager(), getInternalNbFrames() and m_buffer_ctrl_obj accesses
 
@@ -329,10 +358,10 @@ namespace lima
             std::string m_config_file_name;
 
             // Class for detector functionalities to embed the detector controls in the users custom interface e.g. EPICS, Lima etc.
-            lima::AutoPtr<slsDetectorUsers> m_detector_control;
+            slsDetectorUsers * m_detector_control;
 
             // Controller class for detector receivers functionalities
-            lima::AutoPtr<CameraReceivers> m_detector_receivers;
+            CameraReceivers * m_detector_receivers;
 
             // current bit depth
             int m_bit_depth;
@@ -413,7 +442,9 @@ namespace lima
             //------------------------------------------------------------------
             // mutex stuff
             //------------------------------------------------------------------
-            mutable Cond m_cond;
+            // used to protect the concurrent access to sdk methods
+            // mutable keyword is used to allow const methods even if they use this class member
+            mutable lima::Cond m_sdk_cond;
         };
     }
 }

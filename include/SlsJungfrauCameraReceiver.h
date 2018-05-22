@@ -70,12 +70,15 @@ namespace lima
             // constructor
             CameraReceiver();
 
+            // destructor (no need to be virtual)
+            ~CameraReceiver();
+
             //==================================================================
             // gets the receiver
-            lima::AutoPtr<slsReceiverUsers > getReceiver();
+            slsReceiverUsers * getReceiver();
 
             // sets the receiver
-            void setReceiver(lima::AutoPtr<slsReceiverUsers > in_receiver);
+            void setReceiver(slsReceiverUsers * in_receiver);
 
             // gets the host name
             const std::string & getHostName() const;
@@ -90,10 +93,10 @@ namespace lima
             void setTcpipPort(const int in_tcpip_port);
 
             // gets the access to the CameraReceivers object 
-            lima::AutoPtr<CameraReceivers > getReceivers();
+            CameraReceivers * getReceivers();
 
             // sets the access to the CameraReceivers object
-            void setReceivers(lima::AutoPtr<CameraReceivers > in_receivers);
+            void setReceivers(CameraReceivers * in_receivers);
 
             // gets the receiver index
             int getReceiverIndex() const;
@@ -102,13 +105,13 @@ namespace lima
             void setReceiverIndex(const int in_receiver_index);
             
         private:
-            lima::AutoPtr<slsReceiverUsers > m_receiver      ; // sls receiver instance from sls sdk
+            slsReceiverUsers * m_receiver     ; // sls receiver instance from sls sdk
 
-            std::string                      m_host_name     ; // receiver host name  (part of the hostname value in config file)
-            int                              m_tcpip_port    ; // receiver tcpip port (value of rx_tcpport in config file)
+            std::string       m_host_name     ; // receiver host name  (part of the hostname value in config file)
+            int               m_tcpip_port    ; // receiver tcpip port (value of rx_tcpport in config file)
 
-            int                              m_receiver_index; // receiver index in m_receivers_info container
-            lima::AutoPtr<CameraReceivers>   m_receivers     ; // direct access to the CameraReceivers object
+            int               m_receiver_index; // receiver index in m_receivers_info container
+            CameraReceivers * m_receivers     ; // direct access to the CameraReceivers object
         }; 
     }
 }

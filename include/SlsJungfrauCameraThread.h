@@ -75,7 +75,6 @@ namespace lima
             enum
             { 
                 StartAcq = MaxThreadCmd, // command used to start acquisition
-                StopAcq                , // command used to stop  acquisition
             };
 
             // constructor
@@ -87,12 +86,12 @@ namespace lima
             // aborts the thread
             virtual void abort();
 
+            // execute the stop command
+            void execStopAcq();
+
         private:
             // execute the start command
             void execStartAcq();
-
-            // execute the stop command
-            void execStopAcq();
 
         private :
             volatile bool m_force_stop;

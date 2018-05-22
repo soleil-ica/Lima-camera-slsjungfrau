@@ -48,19 +48,32 @@ CameraReceiver::CameraReceiver()
 }
 
 /************************************************************************
- * \brief gets the receiver
- * \return receiver smart pointer
+ * \brief destructor
  ************************************************************************/
-lima::AutoPtr<slsReceiverUsers > CameraReceiver::getReceiver()
+CameraReceiver::~CameraReceiver()
+{
+    if(m_receiver != NULL)
+    {
+        m_receiver->stop();
+        delete m_receiver;
+        m_receiver = NULL;
+    }
+}
+
+/************************************************************************
+ * \brief gets the receiver
+ * \return receiver pointer
+ ************************************************************************/
+slsReceiverUsers * CameraReceiver::getReceiver()
 {
     return m_receiver;
 }
 
 /************************************************************************
  * \brief sets the receiver
- * \param in_receiver new receiver smart pointer
+ * \param in_receiver new receiver pointer
  ************************************************************************/
-void CameraReceiver::setReceiver(lima::AutoPtr<slsReceiverUsers > in_receiver)
+void CameraReceiver::setReceiver(slsReceiverUsers * in_receiver)
 {
     m_receiver = in_receiver;
 }
@@ -105,7 +118,7 @@ void CameraReceiver::setTcpipPort(const int in_tcpip_port)
  * \brief gets the access to the CameraReceivers object 
  * \return CameraReceivers smart pointer
  ************************************************************************/
-lima::AutoPtr<CameraReceivers > CameraReceiver::getReceivers()
+CameraReceivers * CameraReceiver::getReceivers()
 {
     return m_receivers;
 }
@@ -114,7 +127,7 @@ lima::AutoPtr<CameraReceivers > CameraReceiver::getReceivers()
  * \brief sets the access to the CameraReceivers object
  * \param in_receivers CameraReceivers smart pointer
  ************************************************************************/
-void CameraReceiver::setReceivers(lima::AutoPtr<CameraReceivers > in_receivers)
+void CameraReceiver::setReceivers(CameraReceivers * in_receivers)
 {
     m_receivers = in_receivers;
 }
