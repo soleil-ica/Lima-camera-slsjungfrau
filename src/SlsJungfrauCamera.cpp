@@ -45,9 +45,13 @@ using namespace lima::SlsJungfrau;
  * \brief constructor
  * \param in_config_file_name complete path to the configuration file
  * \param in_readout_time_sec readout time in seconds
+ * \param in_receiver_fifo_depth Number of frames in the receiver memory
+ * \param in_frame_packet_number Number of packets we should get in each receiver frame
  ************************************************************************/
-Camera::Camera(const std::string & in_config_file_name,
-               const double        in_readout_time_sec) : m_thread(*this), m_frames_manager(*this)
+Camera::Camera(const std::string & in_config_file_name   ,
+               const double        in_readout_time_sec   ,
+               const long          in_receiver_fifo_depth,
+               const long          in_frame_packet_number) : m_thread(*this), m_frames_manager(*this)
 {
     DEB_CONSTRUCTOR();
 
@@ -63,9 +67,11 @@ Camera::Camera(const std::string & in_config_file_name,
     m_delay_after_trigger = 0.0;
     m_threshold_energy_eV = 0.0;
     m_status              = Camera::Idle; // important for the calls of updateTimes & updateTriggerData in the init method.
-
-    m_readout_time_sec    = in_readout_time_sec;
     m_clock_divider       = Camera::FullSpeed;
+
+    m_readout_time_sec    = in_readout_time_sec   ;
+    m_receiver_fifo_depth = in_receiver_fifo_depth;
+    m_frame_packet_number = static_cast<uint32_t>(in_frame_packet_number);
 
     m_detector_type             = "undefined";
     m_detector_model            = "undefined";
@@ -177,6 +183,15 @@ void Camera::init(const std::string & in_config_file_name)
     // disabling the file write by the camera
     m_detector_control->enableWriteToFile(slsDetectorDefs::DISABLED);
 
+    // setting the receiver fifo depth (number of frames in the receiver memory)
+    // in a next sdk release, we could have a method to call.
+    // At the moment, we should use the put command.
+    {
+        std::stringstream tempStream;
+        tempStream << "rx_fifodepth " << m_receiver_fifo_depth;
+        setCmd(tempStream.str());
+    }
+
     // initing the internal copies of exposure & latency times
     updateTimes();
 
@@ -215,7 +230,7 @@ void Camera::cleanSharedMemory()
 /************************************************************************
  * \brief creates an autolock mutex for sdk methods access
  ************************************************************************/
-lima::AutoMutex Camera::sdkLock()
+lima::AutoMutex Camera::sdkLock() const
 {
     DEB_MEMBER_FUNCT();
     return lima::AutoMutex(m_sdk_cond.mutex());
@@ -284,11 +299,8 @@ void Camera::stopAcq()
     // thread in error
     if(m_thread.getStatus() == CameraThread::Error)
     {
-        // aborting the thread
+        // aborting & restart the thread
         m_thread.abort();
-
-        // restart the thread
-        m_thread.start();
     }
 }
 
@@ -327,16 +339,20 @@ void Camera::acquisitionDataReady(const int      in_receiver_index,
     {
         m_frames_manager.manageFirstFrameTreatment(in_frame_index, in_timestamp);
 
-        uint64_t relative_frame_index = m_frames_manager.computeRelativeFrameIndex(in_frame_index);
-        uint64_t relative_timestamp   = m_frames_manager.computeRelativeTimestamp (in_timestamp  );
+        // ckecking if there is no packet lost.
+        if(in_packet_number == m_frame_packet_number)
+        {
+            uint64_t relative_frame_index = m_frames_manager.computeRelativeFrameIndex(in_frame_index);
+            uint64_t relative_timestamp   = m_frames_manager.computeRelativeTimestamp (in_timestamp  );
 
-        // copying the frame
-        char * dest_buffer = static_cast<char *>(buffer_mgr.getFrameBufferPtr(relative_frame_index));
-        memcpy(dest_buffer, in_data_pointer, in_data_size);
+            // copying the frame
+            char * dest_buffer = static_cast<char *>(buffer_mgr.getFrameBufferPtr(relative_frame_index));
+            memcpy(dest_buffer, in_data_pointer, in_data_size);
 
-        // giving the frame to the frames manager
-        CameraFrame frame(relative_frame_index, in_packet_number, relative_timestamp);
-        m_frames_manager.addReceived(in_receiver_index, frame);
+            // giving the frame to the frames manager
+            CameraFrame frame(relative_frame_index, in_packet_number, relative_timestamp);
+            m_frames_manager.addReceived(in_receiver_index, frame);
+        }
     }
 }
 
@@ -422,8 +438,9 @@ Camera::Status Camera::getDetectorStatus()
     // getting the detector status
     int status = m_detector_control->getDetectorStatus();
 
-    // ready to start acquisition
-    if(status == slsDetectorDefs::runStatus::IDLE)
+    // ready to start acquisition or acquisition stopped externally
+    if((status == slsDetectorDefs::runStatus::IDLE   ) ||
+       (status == slsDetectorDefs::runStatus::STOPPED))
     {
         result = Camera::Idle;
     }
@@ -440,9 +457,8 @@ Camera::Status Camera::getDetectorStatus()
         result = Camera::Running;
     }
     else
-    // acquisition stopped externally, fifo full or unexpected error 
-    if((status == slsDetectorDefs::runStatus::ERROR  ) ||
-       (status == slsDetectorDefs::runStatus::STOPPED))
+    // fifo full or unexpected error 
+    if(status == slsDetectorDefs::runStatus::ERROR)
     {
         result = Camera::Error;
     }

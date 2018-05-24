@@ -44,6 +44,10 @@
 using namespace lima;
 using namespace lima::SlsJungfrau;
 
+
+// activate this define to trace the sdk callbacks 
+//#define CAMERA_RECEIVERS_ACTIVATE_SDK_CALLBACK_TRACE
+
 /************************************************************************
  * \brief constructor
  ************************************************************************/
@@ -507,8 +511,10 @@ int CameraReceivers::startedAcquisitionCallBack(char     * in_file_path ,
                                                 uint32_t   in_data_size ,
                                                 void     * in_user_data )
 {
+#ifdef CAMERA_RECEIVERS_ACTIVATE_SDK_CALLBACK_TRACE
 	cprintf(BLUE, "#### startedAcquisitionCallBack:  filepath:%s  filename:%s fileindex:%llu  datasize:%u ####\n",
 			in_file_path, in_file_name, in_file_index, in_data_size);
+#endif
 
     // we call the internal management of the callback using the user data
     // the user data allows to have access to the 
@@ -527,7 +533,9 @@ int CameraReceivers::startedAcquisitionCallBack(char     * in_file_path ,
 void CameraReceivers::finishedAcquisitionCallBack(uint64_t   in_frames_nb,
                                                   void     * in_user_data)
 {
+#ifdef CAMERA_RECEIVERS_ACTIVATE_SDK_CALLBACK_TRACE
 	cprintf(BLUE, "#### finishedAcquisition: frames:%llu ####\n",in_frames_nb);
+#endif
 
     // we call the internal management of the callback using the user data
     // the user data allows to have access to the 
@@ -543,7 +551,7 @@ void CameraReceivers::finishedAcquisitionCallBack(uint64_t   in_frames_nb,
  *                      sub frame number (Eiger 32 bit mode only)
  * \param in_packet_number number of packets caught for this frame
  * \param in_bunch_id bunch id from beamline
- * \param in_timestamp time stamp  in 10MHz clock (not implemented for most)
+ * \param in_timestamp time stamp in 10MHz clock (not implemented for most)
  * \param in_mod_id module id	(not implemented for most)
  * \param in_x_coord x coordinates (detector id in 1D)
  * \param in_y_coord y coordinates (not implemented)
@@ -573,8 +581,8 @@ void CameraReceivers::acquisitionDataReadyCallBack(uint64_t   in_frame_number  ,
                                                    uint32_t   in_data_size     ,
                                                    void     * in_user_data     )
 {
-
-	PRINT_IN_COLOR (in_mod_id?in_mod_id:in_x_coord,
+#ifdef CAMERA_RECEIVERS_ACTIVATE_SDK_CALLBACK_TRACE
+    PRINT_IN_COLOR (in_mod_id?in_mod_id:in_x_coord,
 			"#### %d GetData: ####\n"
 			"frameNumber: %llu\t\texpLength: %u\t\tpacketNumber: %u\t\tbunchId: %llu\t\ttimestamp: %llu\t\tmodId: %u\t\t"
 			"xCoord: %u\t\tyCoord: %u\t\tzCoord: %u\t\tdebug: %u\t\troundRNumber: %u\t\tdetType: %u\t\t"
@@ -582,6 +590,7 @@ void CameraReceivers::acquisitionDataReadyCallBack(uint64_t   in_frame_number  ,
 			in_x_coord, in_frame_number, in_exp_length, in_packet_number, in_bunch_id, in_timestamp, in_mod_id,
 			in_x_coord, in_y_coord, in_z_coord, in_debug, in_round_r_number, in_det_type, in_version,
 			((uint8_t)(*((uint8_t*)(in_data_pointer)))), in_data_size);
+#endif
 
     // we call the internal management of the callback using the user data
     // the user data allows to have access to the 

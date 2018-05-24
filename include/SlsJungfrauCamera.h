@@ -83,8 +83,10 @@ namespace lima
 
             //==================================================================
             // constructor
-            Camera(const std::string & in_config_file_name,
-                   const double        in_readout_time_sec);
+            Camera(const std::string & in_config_file_name   ,  // complete path to the configuration file
+                   const double        in_readout_time_sec   ,  // readout time in seconds
+                   const long          in_receiver_fifo_depth,  // Number of frames in the receiver memory
+                   const long          in_frame_packet_number); // Number of packets we should get in each receiver frame
 
             // destructor (no need to be virtual)
             ~Camera();
@@ -292,7 +294,7 @@ namespace lima
                 void cleanSharedMemory();
 
                 // creates an autolock mutex for sdk methods access
-                lima::AutoMutex sdkLock();
+                lima::AutoMutex sdkLock() const;
 
                 // Updates exposure & latency times using camera data 
                 void updateTimes();
@@ -357,6 +359,15 @@ namespace lima
             // complete config file path
             std::string m_config_file_name;
 
+            // readout time in seconds
+            double m_readout_time_sec;
+
+            // Number of frames in the receiver memory
+            long m_receiver_fifo_depth;
+
+            // Number of packets we should get in each receiver frame
+            uint32_t m_frame_packet_number;
+
             // Class for detector functionalities to embed the detector controls in the users custom interface e.g. EPICS, Lima etc.
             slsDetectorUsers * m_detector_control;
 
@@ -398,9 +409,6 @@ namespace lima
 
             // number total of frames
             int64_t m_nb_frames;
-
-            // readout time in seconds
-            double m_readout_time_sec;
 
             // detector type
             std::string m_detector_type;

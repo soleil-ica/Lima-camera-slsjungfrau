@@ -69,8 +69,7 @@ void CameraFrames::addReceived(const int           in_receiver_index,
     DEB_MEMBER_FUNCT();
 
     // protecting the containers access
-    lima::AutoMutex       container_mutex(m_cond.mutex());
-    lima::AutoMutexUnlock auto_unlock(container_mutex);
+    lima::AutoMutex container_mutex = containersLock();
 
     // the received frames container management is not usefull when the camera has only one receiver
     // and we do not need to rebuild the image with image parts.
@@ -116,8 +115,9 @@ void CameraFrames::addReceived(const int           in_receiver_index,
         // insert the frame in the complete frame container
         const CameraFrame & frame = (*received_search).second;
         
-        DEB_TRACE() << "CameraFrames::addReceived - new complete frame "
-                    << "<" << DEB_VAR3(frame.getIndex(), frame.getPacketNumber(), frame.getTimestamp()) << ">";
+        DEB_TRACE() << "New complete frame [ " << frame.getIndex()        << ", "
+                                               << frame.getPacketNumber() << ", " 
+                                               << frame.getTimestamp()    << " ]"; 
 
         m_complete_frames.push_back(frame);
 
@@ -139,8 +139,7 @@ bool CameraFrames::getFirstComplete(CameraFrame & out_frame)
     bool result = false;
 
     // protecting the containers access
-    lima::AutoMutex       container_mutex(m_cond.mutex());
-    lima::AutoMutexUnlock auto_unlock(container_mutex);
+    lima::AutoMutex container_mutex = containersLock();
 
     if(!m_complete_frames.empty())
     {
@@ -159,8 +158,7 @@ void CameraFrames::moveFirstCompleteToTreated()
     DEB_MEMBER_FUNCT();
 
     // protecting the containers access
-    lima::AutoMutex       container_mutex(m_cond.mutex());
-    lima::AutoMutexUnlock auto_unlock(container_mutex);
+    lima::AutoMutex container_mutex = containersLock();
 
     if(!m_complete_frames.empty())
     {
@@ -168,8 +166,9 @@ void CameraFrames::moveFirstCompleteToTreated()
         m_complete_frames.pop_front();
         m_treated_frames.push_back(frame);
 
-        DEB_TRACE() << "CameraFrames::addTreated - new treated frame "
-                    << "<" << DEB_VAR3(frame.getIndex(), frame.getPacketNumber(), frame.getTimestamp()) << ">";
+        DEB_TRACE() << "New treated frame [ " << frame.getIndex()        << ", "
+                                              << frame.getPacketNumber() << ", " 
+                                              << frame.getTimestamp()    << " ]"; 
     }
     else
     // this should never happen.
@@ -189,8 +188,7 @@ void CameraFrames::getNbFrames(size_t & out_received,
     DEB_MEMBER_FUNCT();
 
     // protecting the containers access
-    lima::AutoMutex       container_mutex(m_cond.mutex());
-    lima::AutoMutexUnlock auto_unlock(container_mutex);
+    lima::AutoMutex container_mutex = containersLock();
 
     out_received = m_received_frames.size();
     out_complete = m_complete_frames.size();
@@ -206,8 +204,7 @@ size_t CameraFrames::getNbTreatedFrames() const
     DEB_MEMBER_FUNCT();
 
     // protecting the containers access
-    lima::AutoMutex       container_mutex(m_cond.mutex());
-    lima::AutoMutexUnlock auto_unlock(container_mutex);
+    lima::AutoMutex container_mutex = containersLock();
 
     return m_treated_frames.size();
 }
@@ -221,8 +218,7 @@ size_t CameraFrames::getNbNotTreatedFrames() const
     DEB_MEMBER_FUNCT();
 
     // protecting the containers access
-    lima::AutoMutex       container_mutex(m_cond.mutex());
-    lima::AutoMutexUnlock auto_unlock(container_mutex);
+    lima::AutoMutex container_mutex = containersLock();
 
     return m_received_frames.size() + m_complete_frames.size();
 }
@@ -246,8 +242,7 @@ void CameraFrames::clear()
     DEB_MEMBER_FUNCT();
 
     // protecting the containers access
-    lima::AutoMutex       container_mutex(m_cond.mutex());
-    lima::AutoMutexUnlock auto_unlock(container_mutex);
+    lima::AutoMutex container_mutex = containersLock();
 
     m_received_frames.clear();
     m_complete_frames.clear();
@@ -297,5 +292,14 @@ uint64_t CameraFrames::computeRelativeTimestamp(const uint64_t in_absolute_times
 
     return (in_absolute_timestamp - m_first_timestamp);
 }   
+
+/************************************************************************
+ * \brief creates an autolock mutex for containers methods access
+ ************************************************************************/
+lima::AutoMutex CameraFrames::containersLock() const
+{
+    DEB_MEMBER_FUNCT();
+    return lima::AutoMutex(m_containers_cond.mutex());
+}
 
 //========================================================================================
