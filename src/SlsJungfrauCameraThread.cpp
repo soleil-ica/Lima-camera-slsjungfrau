@@ -42,6 +42,10 @@ using namespace lima::SlsJungfrau;
 
 #include <cmath>
 
+// define it if you want an absolute timestamp in the frame data.
+// let it commented if you want a relative timestamp in the frame data (starting at 0).
+//#define CAMERA_THREAD_USE_ABSOLUTE_TIMESTAMP
+
 /************************************************************************
  * \brief constructor
  ************************************************************************/
@@ -181,25 +185,9 @@ void CameraThread::execStartAcq()
     while ((!m_force_stop)&&(m_cam.getNbAcquiredFrames() < m_cam.getInternalNbFrames()))
     {
         CameraFrames & frame_manager = m_cam.getFrameManager();
-        CameraFrame    complete_frame;
 
-        // getting the first complete frame from complete frames container
-        while(frame_manager.getFirstComplete(complete_frame))
-        {
-            // TO DO - manage the packets lost
-            // complete_frame.getPacketNumber();
-
-            HwFrameInfoType frame_info;
-            frame_info.acq_frame_nb    = complete_frame.getIndex();
-            frame_info.frame_timestamp = start_timestamp + Timestamp(complete_frame.getTimestamp());
-
-            //Pushing the image buffer through Lima 
-            DEB_TRACE() << "New Frame Ready (" << frame_info.acq_frame_nb << ")";
-            buffer_mgr.newFrameReady(frame_info);
-
-            // the complete frame has been treated, so we move it to the final container
-            frame_manager.moveFirstCompleteToTreated();
-        }
+        // treating all complete frames
+        treatCompleteFrames(start_timestamp, buffer_mgr);
 
         // checking if the hardware acquisition is running and if there is no more frame to treat in the containers
         Camera::Status status = m_cam.getDetectorStatus();
@@ -216,36 +204,27 @@ void CameraThread::execStartAcq()
     }
 
     // acquisition was aborted
-    if(m_force_stop)
+    if((m_force_stop) || (m_cam.getNbAcquiredFrames() < m_cam.getInternalNbFrames()))
     {
         Camera::Status status = m_cam.getDetectorStatus();
 
-        // checking if the hardware acquisition is running
+        // checking if the hardware acquisition is running or in error
         if((status == Camera::Waiting) || 
            (status == Camera::Running))
         {
             // stop detector acquisition
-            if(m_cam.stopAcquisition() == slsDetectorDefs::FAIL)
-            {
-                m_cam.stopReceiver(); // try to stop receiver listening mode
-
-                setStatus(CameraThread::Error);
-
-                std::string errorText = "CameraThread::execStartAcq - can not stop real time acquisition!";
-                REPORT_EVENT(errorText);
-                return;
-            }
+            m_cam.stopAcquisition();
         }
-    }
-    else
-    // problem occured during the acquisition
-    if(m_cam.getNbAcquiredFrames() < m_cam.getInternalNbFrames())
-    {
-        // stop detector acquisition
-        if(m_cam.stopAcquisition() == slsDetectorDefs::FAIL)
-        {
-            m_cam.stopReceiver(); // try to stop receiver listening mode
 
+        // stop receiver listening mode
+        m_cam.stopReceiver();
+
+        // treating all complete frames which were not treated yet
+        treatCompleteFrames(start_timestamp, buffer_mgr);
+
+        // problem occured during the acquisition ?
+        if(!m_force_stop)
+        {
             setStatus(CameraThread::Error);
 
             size_t received;
@@ -260,11 +239,22 @@ void CameraThread::execStartAcq()
 
             std::string errorText = "CameraThread::execStartAcq - lost packets during real time acquisition!";
             REPORT_EVENT(errorText);
-            return;
+        }
+    }
+    else
+    // no problem occured during the acquisition
+    {
+        // stopping receiver listening mode
+        if(m_cam.stopReceiver() == slsDetectorDefs::FAIL)
+        {
+            setStatus(CameraThread::Error);
+
+            std::string errorText = "CameraThread::execStartAcq - can not stop real time acquisition!";
+            REPORT_EVENT(errorText);
         }
     }
 
-    // waiting for an idle hardware status
+    // waiting for an idle or error hardware status
     for(;;)
     {
         Camera::Status status = m_cam.getDetectorStatus();
@@ -281,16 +271,50 @@ void CameraThread::execStartAcq()
         }
     }
 
-    // stopping receiver listening mode
-    if(m_cam.stopReceiver() == slsDetectorDefs::FAIL)
+    // change the thread status only if the thread is not in error
+    if(getStatus() == CameraThread::Running)
     {
-        setStatus(CameraThread::Error);
-
-        std::string errorText = "CameraThread::execStartAcq - can not stop real time acquisition!";
-        REPORT_EVENT(errorText);
-        return;
+        setStatus(CameraThread::Idle);
     }
-
-    setStatus(CameraThread::Idle);
 }
+
+/************************************************************************
+ * \brief treat all complete frames
+ * \param in_start_timestamp start timestamp
+ * \param in_buffer_mgr buffer manager
+************************************************************************/
+void CameraThread::treatCompleteFrames(Timestamp        in_start_timestamp,
+                                       StdBufferCbMgr & in_buffer_mgr     )
+{
+    DEB_MEMBER_FUNCT();
+
+    CameraFrames & frame_manager = m_cam.getFrameManager();
+    CameraFrame    complete_frame;
+
+    // getting the first complete frame from complete frames container
+    while(frame_manager.getFirstComplete(complete_frame))
+    {
+        HwFrameInfoType frame_info;
+        double frame_timestamp_sec;
+
+        frame_info.acq_frame_nb = complete_frame.getIndex();
+
+        // converting the timestamp which is in 10MHz to seconds
+        frame_timestamp_sec = static_cast<double>(complete_frame.getTimestamp()) / 10000000.0;
+
+    #ifdef CAMERA_THREAD_USE_ABSOLUTE_TIMESTAMP
+        frame_info.frame_timestamp = in_start_timestamp + Timestamp(frame_timestamp_sec);
+    #else
+        frame_info.frame_timestamp = Timestamp(frame_timestamp_sec);
+    #endif
+
+        //Pushing the image buffer through Lima 
+        DEB_TRACE() << "New Frame Ready (" << frame_info.acq_frame_nb << ")";
+        in_buffer_mgr.newFrameReady(frame_info);
+
+        // the complete frame has been treated, so we move it to the final container
+        frame_manager.moveFirstCompleteToTreated();
+    }
+}
+
 //========================================================================================

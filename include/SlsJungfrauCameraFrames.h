@@ -114,6 +114,9 @@ namespace lima
             // type of container which contains the frames already passed to Lima newFrameReady method
         	typedef std::list<CameraFrame> TreatedFramesContainer ;
 
+            // creates an autolock mutex for containers methods access
+            lima::AutoMutex containersLock() const;
+
         private:
             // direct access to camera
             Camera & m_cam;
@@ -132,7 +135,7 @@ namespace lima
             //==================================================================
             // used to protect the containers access
             // mutable keyword is used to allow const methods even if they use this class member
-            mutable lima::Cond m_cond;
+            mutable lima::Cond m_containers_cond;
 
             //==================================================================
             // true if the first frame index has been received, else false.

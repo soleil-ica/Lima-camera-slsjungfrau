@@ -93,6 +93,10 @@ namespace lima
             // execute the start command
             void execStartAcq();
 
+            // treat all complete frames
+            void treatCompleteFrames(Timestamp        in_start_timestamp,
+                                     StdBufferCbMgr & in_buffer_mgr     );
+
         private :
             volatile bool m_force_stop;
 
