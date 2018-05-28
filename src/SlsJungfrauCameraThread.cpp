@@ -145,9 +145,6 @@ void CameraThread::execStartAcq()
 
     m_force_stop = false;
 
-    // the tread is running a new acquisition
-    setStatus(CameraThread::Running);
-
     // making an alias on buffer manager
     StdBufferCbMgr & buffer_mgr = m_cam.m_buffer_ctrl_obj.getBuffer();
 
@@ -156,7 +153,7 @@ void CameraThread::execStartAcq()
     {
         setStatus(CameraThread::Error);
 
-        std::string errorText = "CameraThread::execStartAcq - can not start the receiver listening mode!";
+        std::string errorText = "Can not start the receiver listening mode!";
         REPORT_EVENT(errorText);
         return;
     }
@@ -169,10 +166,13 @@ void CameraThread::execStartAcq()
 
         setStatus(CameraThread::Error);
 
-        std::string errorText = "CameraThread::execStartAcq - can not start real time acquisition!";
+        std::string errorText = "Can not start real time acquisition!";
         REPORT_EVENT(errorText);
         return;
     }
+
+    // the tread is running a new acquisition (it frees the Camera::startAcq method)
+    setStatus(CameraThread::Running);
 
     // setting the start timestamp
     Timestamp start_timestamp = Timestamp::now();
@@ -227,6 +227,7 @@ void CameraThread::execStartAcq()
         {
             setStatus(CameraThread::Error);
 
+            size_t lost_frames_nb = m_cam.getInternalNbFrames() - m_cam.getNbAcquiredFrames();
             size_t received;
             size_t complete;
             size_t treated ;
@@ -237,8 +238,9 @@ void CameraThread::execStartAcq()
             DEB_TRACE() << "frames complete (" << complete << ")";
             DEB_TRACE() << "frames treated ("  << treated  << ")";
 
-            std::string errorText = "CameraThread::execStartAcq - lost packets during real time acquisition!";
-            REPORT_EVENT(errorText);
+            std::stringstream tempStream;
+            tempStream << "Lost " << lost_frames_nb << " packets during real time acquisition!";
+            REPORT_EVENT(tempStream.str());
         }
     }
     else
@@ -249,7 +251,7 @@ void CameraThread::execStartAcq()
         {
             setStatus(CameraThread::Error);
 
-            std::string errorText = "CameraThread::execStartAcq - can not stop real time acquisition!";
+            std::string errorText = "Could not stop real time acquisition!";
             REPORT_EVENT(errorText);
         }
     }
@@ -309,7 +311,7 @@ void CameraThread::treatCompleteFrames(Timestamp        in_start_timestamp,
     #endif
 
         //Pushing the image buffer through Lima 
-        DEB_TRACE() << "New Frame Ready (" << frame_info.acq_frame_nb << ")";
+        DEB_TRACE() << "New Frame Ready [ " << frame_info.acq_frame_nb << ", " << frame_timestamp_sec << " ]";
         in_buffer_mgr.newFrameReady(frame_info);
 
         // the complete frame has been treated, so we move it to the final container
