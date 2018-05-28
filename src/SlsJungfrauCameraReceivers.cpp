@@ -237,7 +237,6 @@ void CameraReceivers::acquisitionDataReady(const int      in_receiver_index,
                                            const uint32_t in_data_size     )
 {
     DEB_MEMBER_FUNCT();
-    DEB_TRACE() << "CameraReceivers::getAcquisitionData";
 
     // the camera will manage the new frame
     m_cam.acquisitionDataReady(in_receiver_index, 

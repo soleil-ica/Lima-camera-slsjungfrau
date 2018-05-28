@@ -51,6 +51,10 @@ Interface::Interface(Camera & cam) : m_cam(cam), m_det_info(cam), m_sync(cam)
     
     HwBufferCtrlObj *buffer = cam.getBufferCtrlObj();
     m_cap_list.push_back(HwCap(buffer));
+
+    //event capability
+    m_event = m_cam.getEventCtrlObj();    
+    m_cap_list.push_back(HwCap(m_event));
 }
 
 /*******************************************************************

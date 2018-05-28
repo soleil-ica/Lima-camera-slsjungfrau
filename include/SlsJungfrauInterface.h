@@ -112,6 +112,7 @@ namespace lima
             CapList          m_cap_list; // capability list
             DetInfoCtrlObj   m_det_info; // detector info control object
             SyncCtrlObj      m_sync    ; // synchronization data control object
+            HwEventCtrlObj * m_event   ;
         };
     } // namespace SlsJungfrau
 } // namespace lima

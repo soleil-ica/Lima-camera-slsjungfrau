@@ -339,10 +339,11 @@ void Camera::acquisitionDataReady(const int      in_receiver_index,
     {
         m_frames_manager.manageFirstFrameTreatment(in_frame_index, in_timestamp);
 
+        uint64_t relative_frame_index = m_frames_manager.computeRelativeFrameIndex(in_frame_index);
+
         // ckecking if there is no packet lost.
         if(in_packet_number == m_frame_packet_number)
         {
-            uint64_t relative_frame_index = m_frames_manager.computeRelativeFrameIndex(in_frame_index);
             uint64_t relative_timestamp   = m_frames_manager.computeRelativeTimestamp (in_timestamp  );
 
             // copying the frame
@@ -352,6 +353,11 @@ void Camera::acquisitionDataReady(const int      in_receiver_index,
             // giving the frame to the frames manager
             CameraFrame frame(relative_frame_index, in_packet_number, relative_timestamp);
             m_frames_manager.addReceived(in_receiver_index, frame);
+        }
+        else
+        // rejected frame
+        {
+            DEB_TRACE() << "Rejected Frame [ " << relative_frame_index << ", " << in_packet_number << " ]";
         }
     }
 }
@@ -944,8 +950,8 @@ void Camera::updateTimes()
         }
 
         // compute latency time
-        // exposure period = exposure time + readout time + latency time
-        m_latency_time = exposure_period - m_exposure_time - m_readout_time_sec;
+        // exposure period = exposure time + latency time
+        m_latency_time = exposure_period - m_exposure_time;
     }
 }
 
@@ -984,9 +990,9 @@ void Camera::setExpTime(double in_exp_time)
         lima::AutoMutex sdk_mutex = sdkLock(); 
 
         // if we change the exposure time, we need to update also the exposure period
-        // exposure period = exposure time + readout time + latency time
+        // exposure period = exposure time + latency time
         exposure_time   = m_detector_control->setExposureTime  (in_exp_time, true); // in seconds
-        exposure_period = m_detector_control->setExposurePeriod(exposure_time + m_readout_time_sec + m_latency_time, true); // in seconds
+        exposure_period = m_detector_control->setExposurePeriod(exposure_time + m_latency_time, true); // in seconds
     }
 
     // updating the internal copies of exposure & latency times
@@ -1024,8 +1030,8 @@ void Camera::setLatencyTime(double in_latency_time)
     {
         lima::AutoMutex sdk_mutex = sdkLock(); 
 
-        // exposure period = exposure time + readout time + latency time
-        m_detector_control->setExposurePeriod(m_exposure_time + m_readout_time_sec + in_latency_time, true); // in seconds
+        // exposure period = exposure time + latency time
+        m_detector_control->setExposurePeriod(m_exposure_time + in_latency_time, true); // in seconds
     }
 
     // updating the internal copies of exposure & latency times
@@ -1122,7 +1128,7 @@ uint64_t Camera::getInternalNbFrames()
 HwSyncCtrlObj::ValidRangesType Camera::getValidRanges() const
 {
     DEB_MEMBER_FUNCT();
-// CCA:TODO
+
     double          min_time = 10e-9;
     double          max_time = 10e+9;
 
@@ -1130,7 +1136,7 @@ HwSyncCtrlObj::ValidRangesType Camera::getValidRanges() const
 
     valid_ranges.min_exp_time = min_time;
     valid_ranges.max_exp_time = max_time;
-    valid_ranges.min_lat_time = min_time;
+    valid_ranges.min_lat_time = m_readout_time_sec;
     valid_ranges.max_lat_time = max_time;
 
     return valid_ranges;
