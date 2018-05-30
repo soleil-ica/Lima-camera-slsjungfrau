@@ -145,6 +145,9 @@ void CameraThread::execStartAcq()
 
     m_force_stop = false;
 
+    // the tread is running a new acquisition (it frees the Camera::startAcq method)
+    setStatus(CameraThread::Running);
+
     // making an alias on buffer manager
     StdBufferCbMgr & buffer_mgr = m_cam.m_buffer_ctrl_obj.getBuffer();
 
@@ -170,9 +173,6 @@ void CameraThread::execStartAcq()
         REPORT_EVENT(errorText);
         return;
     }
-
-    // the tread is running a new acquisition (it frees the Camera::startAcq method)
-    setStatus(CameraThread::Running);
 
     // setting the start timestamp
     Timestamp start_timestamp = Timestamp::now();
@@ -225,22 +225,27 @@ void CameraThread::execStartAcq()
         // problem occured during the acquisition ?
         if(!m_force_stop)
         {
-            setStatus(CameraThread::Error);
-
             size_t lost_frames_nb = m_cam.getInternalNbFrames() - m_cam.getNbAcquiredFrames();
-            size_t received;
-            size_t complete;
-            size_t treated ;
-            
-            m_cam.getNbFrames(received, complete, treated );
 
-            DEB_TRACE() << "frames received (" << received << ")";
-            DEB_TRACE() << "frames complete (" << complete << ")";
-            DEB_TRACE() << "frames treated ("  << treated  << ")";
+            // checking again because sometimes the camera status can change to idle before we receive the frame
+            if(lost_frames_nb > 0)
+            {
+                setStatus(CameraThread::Error);
 
-            std::stringstream tempStream;
-            tempStream << "Lost " << lost_frames_nb << " packets during real time acquisition!";
-            REPORT_EVENT(tempStream.str());
+                size_t received;
+                size_t complete;
+                size_t treated ;
+                
+                m_cam.getNbFrames(received, complete, treated );
+
+                DEB_TRACE() << "frames received (" << received << ")";
+                DEB_TRACE() << "frames complete (" << complete << ")";
+                DEB_TRACE() << "frames treated ("  << treated  << ")";
+
+                std::stringstream tempStream;
+                tempStream << "Lost " << lost_frames_nb << " frames during real time acquisition!";
+                REPORT_EVENT(tempStream.str());
+            }
         }
     }
     else
