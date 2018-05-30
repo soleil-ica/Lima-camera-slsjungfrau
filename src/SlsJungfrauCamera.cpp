@@ -513,7 +513,7 @@ Camera::Status Camera::getStatus()
     // So we use the latest read camera status.
     if(thread_status == CameraThread::Running)
     {
-        result = m_status;
+        result = Camera::Running;
     }
     else
     // the device is not in acquisition or in error, so we can read the hardware camera status
@@ -903,6 +903,37 @@ void Camera::setTrigMode(lima::TrigMode in_mode)
 
         // apply the trigger change
         m_detector_control->setTimingMode(trigger_mode_index);
+
+        // change the frames per cycle and the cycles values
+        int64_t nb_frames_per_cycle;
+        int64_t nb_cycles          ;
+
+        switch (in_mode)
+        {       
+            case lima::TrigMode::IntTrig:
+                nb_frames_per_cycle = m_nb_frames;
+                nb_cycles           = 1LL;
+                break;
+
+            case lima::TrigMode::ExtTrigSingle:
+                nb_frames_per_cycle = m_nb_frames;
+                nb_cycles           = 1LL;
+                break;
+
+            case lima::TrigMode::ExtTrigMult:
+                nb_frames_per_cycle = 1LL;
+                nb_cycles           = m_nb_frames;
+                break;
+
+            default:
+                break;
+        }
+
+        // setting the number of cycles
+        m_nb_cycles = m_detector_control->setNumberOfCycles(nb_cycles);
+
+        // setting the number of frames per cycle
+        m_nb_frames_per_cycle = m_detector_control->setNumberOfFrames(nb_frames_per_cycle);
     }
 
     // reseting the number of frames to its old value to 
