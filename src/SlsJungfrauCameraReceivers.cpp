@@ -108,7 +108,7 @@ void CameraReceivers::init(const std::string & in_config_file_name)
     	int ret = slsReceiverDefs::OK;
 
         // changing the udp port in the args
-	    sprintf(temp_port, "%d", receivers[receiver_index].getTcpipPort());
+        sprintf(temp_port, "%d", receivers[receiver_index].getTcpipPort());
 
         // creating the receiver using the args
         DEB_TRACE() << "creating the receiver "

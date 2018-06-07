@@ -904,6 +904,9 @@ void Camera::setTrigMode(lima::TrigMode in_mode)
         // apply the trigger change
         m_detector_control->setTimingMode(trigger_mode_index);
 
+        // converting trigger mode index to trigger mode label
+        m_trig_mode_label = slsDetectorUsers::getTimingMode(trigger_mode_index);
+
         // change the frames per cycle and the cycles values
         int64_t nb_frames_per_cycle;
         int64_t nb_cycles          ;
@@ -934,11 +937,29 @@ void Camera::setTrigMode(lima::TrigMode in_mode)
 
         // setting the number of frames per cycle
         m_nb_frames_per_cycle = m_detector_control->setNumberOfFrames(nb_frames_per_cycle);
-    }
 
-    // reseting the number of frames to its old value to 
-    // correctly set the nb frames per cycle and the number of cycles
-    setNbFrames(m_nb_frames);
+        // computing the lima trigger mode
+        if(m_trig_mode_label == SLS_TRIGGER_MODE_AUTO)
+        {
+            m_trig_mode = lima::TrigMode::IntTrig;
+        }
+        else
+        if(m_trig_mode_label == SLS_TRIGGER_MODE_TRIGGER)
+        {
+            if(m_nb_cycles == 1LL)
+            {
+                m_trig_mode = lima::TrigMode::ExtTrigSingle;
+            }
+            else
+            {
+                m_trig_mode = lima::TrigMode::ExtTrigMult;
+            }
+        }
+        else
+        {
+            THROW_HW_ERROR(ErrorType::Error) << "updateTriggerData : This camera trigger Mode is not managed! (" << m_trig_mode_label << ")";
+        }
+    }
 }
 
 /*******************************************************************
