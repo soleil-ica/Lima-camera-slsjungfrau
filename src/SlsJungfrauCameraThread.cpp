@@ -141,11 +141,11 @@ void CameraThread::execStartAcq()
     DEB_MEMBER_FUNCT();
     DEB_TRACE() << "executing StartAcq command...";
 
-    const double sleep_time_sec = 0.5; // sleep the tread in seconds
+    const double sleep_time_sec = 0.5; // sleep the thread in seconds
 
     m_force_stop = false;
 
-    // the tread is running a new acquisition (it frees the Camera::startAcq method)
+    // the thread is running a new acquisition (it frees the Camera::startAcq method)
     setStatus(CameraThread::Running);
 
     // making an alias on buffer manager
@@ -192,15 +192,21 @@ void CameraThread::execStartAcq()
         // checking if the hardware acquisition is running and if there is no more frame to treat in the containers
         Camera::Status status = m_cam.getDetectorStatus();
 
-        if((status != Camera::Waiting) && 
-           (status != Camera::Running) &&
-           (frame_manager.NoMoreFrameToTreat()))
+        if((status != Camera::Waiting) && (status != Camera::Running))
         {
-            // we stop the treatment - seems we have lost frame(s)
-            break;
+            lima::Sleep(sleep_time_sec); // sleep the thread in seconds because a data callback can be activated
+
+            if(frame_manager.NoMoreFrameToTreat())
+            {
+                // we stop the treatment - seems we have lost frame(s)
+                break;
+            }
         }
-        
-        lima::Sleep(sleep_time_sec); // sleep the tread in seconds
+        else
+        // hardware acquisition is running, we are waiting for new frames not using the cpu during this time
+        {
+            lima::Sleep(sleep_time_sec); // sleep the thread in seconds
+        }
     }
 
     // acquisition was aborted
@@ -274,7 +280,7 @@ void CameraThread::execStartAcq()
         }
         else
         {
-            lima::Sleep(sleep_time_sec); // sleep the tread in seconds
+            lima::Sleep(sleep_time_sec); // sleep the thread in seconds
         }
     }
 
