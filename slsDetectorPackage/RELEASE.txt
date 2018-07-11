@@ -1,31 +1,26 @@
-SLS Detector Package 3.1.1 released on 2018-03-20
+SLS Detector Package 3.1.3 released on 2018-06-28
 =================================================
 
 
 
 INTRODUCTION
 
-This document describes the differences between 3.1.0 into 3.1.0 releases.
+This document describes the differences between 3.1.3 into 3.1.2 releases.
 
 
 Topics Concerning
 ==================
-	Jungfrau adcphase
-	Eiger in 10 GbE mode
+	Using delay after trigger for Jungfrau
 
 
 Resolved Issues
 ===============
 
-	Detector Server and Client
-	--------------------------
-	1. 	(Jungfrau) Bug fix: Same adc phase given to the PLL will still shift
-		adc by one step. One can now give same adc phase repeatedly.
+	Detector Server
+	---------------
+	1.	Delay after trigger was always set to 5 seconds. This is fixed now.
+	3.	Get delay left after trigger is not available for this version.
 	
-		Updated Command Line Manual for adcphase and clkdivider.
-		
-	2.	(Eiger) Bug Fix: This bug was introduced in 3.1.0 release.
-		In 10GbE mode, if "detectorip" is before "tengiga", the detector still
-		used the 1G IP (DHCP IP). This is fixed in this release.
+
 
 
