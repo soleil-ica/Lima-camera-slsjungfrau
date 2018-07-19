@@ -18,7 +18,7 @@
     
 	<properties>
 		<!-- path to the 64 bits libs ${FL-64bits-libs} -->
-        <FL-64bits-libs>../../../binaries-backup-master/el6-64</FL-64bits-libs>
+        <libs-64bits>/home/informatique/ica/ica/LIB_EL6_64</libs-64bits>
 	</properties>
     
     <scm>
