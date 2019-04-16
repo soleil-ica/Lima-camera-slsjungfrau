@@ -10,7 +10,7 @@
 
     <groupId>fr.soleil.lib.Lima.Camera</groupId>
     <artifactId>LimaSlsJungfrau-${aol}-shared-${mode}</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
 
     <packaging>nar</packaging>
     <name>LimaSlsJungfrau</name>
@@ -26,7 +26,7 @@
         <dependency>
             <groupId>fr.soleil.lib</groupId>
             <artifactId>LimaCore-${aol}-shared-${mode}</artifactId>
-            <version>RELEASE</version>
+            <version>1.7.8</version>
         </dependency>
     </dependencies>
 
