@@ -1,5 +1,6 @@
 set(SOURCES
     multiSlsDetector/multiSlsDetector.cpp 
+    sharedMemory/SharedMemory.cpp
     slsDetector/slsDetectorUsers.cpp 
     slsDetector/slsDetectorUtils.cpp
     slsDetector/slsDetectorCommand.cpp
@@ -22,36 +23,22 @@ set(HEADERS
 )
 
 include_directories(
-commonFiles
-multiSlsDetector 
-slsDetector 
-slsDetectorUtils 
-slsDetectorCommand 
-slsDetectorAnalysis 
-slsReceiverInterface 
-threadFiles
-usersFunctions 
-../slsReceiverSoftware/include 
-../slsReceiverSoftware/MySocketTCP 
+    commonFiles
+    multiSlsDetector 
+    sharedMemory
+    slsDetector 
+    slsDetectorUtils 
+    slsDetectorCommand 
+    slsDetectorAnalysis 
+    slsReceiverInterface 
+    threadFiles
+    usersFunctions 
+    ../slsReceiverSoftware/include 
+    ../slsReceiverSoftware/MySocketTCP 
 )
 
 add_definitions(
     -DDACS_INT
-)
-
-add_library(zmq STATIC IMPORTED )
-
-set_target_properties(zmq PROPERTIES
-    IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/../slsReceiverSoftware/include/libzmq.a
-)
-
-add_library(slsDetectorStatic STATIC
-    ${SOURCES}
-    ${HEADERS}
-)
-set_target_properties(slsDetectorStatic PROPERTIES
-    ARCHIVE_OUTPUT_NAME SlsDetector
-    ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
 
 add_library(slsDetectorShared SHARED
@@ -63,6 +50,8 @@ set(PUBLICHEADERS
     commonFiles/sls_detector_defs.h
     commonFiles/sls_detector_funcs.h
     commonFiles/error_defs.h
+    commonFiles/versionAPI.h
+    sharedMemory/SharedMemory.h
     slsDetector/slsDetectorUtils.h
     slsDetector/slsDetector.h
     slsDetector/slsDetectorActions.h
@@ -79,7 +68,9 @@ set(PUBLICHEADERS
     slsDetectorAnalysis/fileIOStatic.h
     multiSlsDetector/multiSlsDetector.h
     slsReceiverInterface/receiverInterface.h
-
+    ../slsReceiverSoftware/include/sls_receiver_exceptions.h
+    slsDetector/slsDetectorUsers.h
+    ../slsReceiverSoftware/include/slsReceiverUsers.h
 )
 set_target_properties(slsDetectorShared PROPERTIES
     LIBRARY_OUTPUT_NAME SlsDetector
@@ -100,7 +91,8 @@ if(DOXYGEN_FOUND)
     )
 endif()
 
-install(TARGETS slsDetectorShared slsDetectorStatic
+install(TARGETS slsDetectorShared
+    EXPORT "${TARGETS_EXPORT_NAME}"
     LIBRARY DESTINATION lib
     PUBLIC_HEADER DESTINATION include
     ARCHIVE DESTINATION lib)

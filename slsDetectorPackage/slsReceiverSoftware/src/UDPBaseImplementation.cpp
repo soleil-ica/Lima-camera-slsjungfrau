@@ -5,13 +5,10 @@
  ***********************************************/
 
 #include "UDPBaseImplementation.h"
-#include "genericSocket.h"
-#include "ZmqSocket.h"
 
 #include <sys/stat.h> 		// stat
 #include <iostream>
 #include <string.h>
-using namespace std;
 
 
 
@@ -30,6 +27,7 @@ UDPBaseImplementation::UDPBaseImplementation(){
 	acquisitionFinishedCallBack = NULL;
 	pAcquisitionFinished = NULL;
 	rawDataReadyCallBack = NULL;
+	rawDataModifyReadyCallBack = NULL;
 	pRawDataReady = NULL;
 }
 
@@ -46,43 +44,54 @@ void UDPBaseImplementation::initializeMembers(){
 	acquisitionPeriod = 0;
 	acquisitionTime = 0;
 	subExpTime = 0;
+	subPeriod = 0;
 	numberOfFrames = 0;
+	numberOfSamples = 0;
 	dynamicRange = 16;
 	tengigaEnable = false;
 	fifoDepth = 0;
 	flippedData[0] = 0;
 	flippedData[1] = 0;
+	gapPixelsEnable = false;
 
 	//***receiver parameters***
 	status = IDLE;
 	activated = true;
+	deactivatedPaddingEnable = true;
+	frameDiscardMode = NO_DISCARD;
+	framePadding = false;
 
 	//***connection parameters***
 	strcpy(eth,"");
 	for(int i=0;i<MAX_NUMBER_OF_LISTENING_THREADS;i++){
 		udpPortNum[i] = DEFAULT_UDP_PORTNO + i;
 	}
+	udpSocketBufferSize = 0;
+	actualUDPSocketBufferSize = 0;
 
 	//***file parameters***
 	fileFormatType = BINARY;
 	strcpy(fileName,"run");
 	strcpy(filePath,"");
 	fileIndex = 0;
+	framesPerFile = 0;
 	scanTag = 0;
-	frameIndexEnable = false;
 	fileWriteEnable = true;
 	overwriteEnable = true;
 	dataCompressionEnable = false;
 
 	//***acquisition parameters***
-	shortFrameEnable = -1;
+	roi.clear();
 	frameToGuiFrequency = 0;
 	frameToGuiTimerinMS = DEFAULT_STREAMING_TIMER_IN_MS;
 	dataStreamEnable = false;
 	streamingPort = 0;
+	memset(streamingSrcIP, 0, sizeof(streamingSrcIP));
+    memset(additionalJsonHeader, 0, sizeof(additionalJsonHeader));
 
 	//***receiver parameters***
-	silentMode = 0;
+	silentMode = false;
+
 }
 
 UDPBaseImplementation::~UDPBaseImplementation(){}
@@ -94,9 +103,15 @@ UDPBaseImplementation::~UDPBaseImplementation(){}
  *************************************************************************/
 
 /**initial parameters***/
-int* UDPBaseImplementation::getMultiDetectorSize() const{	FILE_LOG(logDEBUG) << __AT__ << " starting"; return (int*) numDet;}
+int* UDPBaseImplementation::getMultiDetectorSize() const{
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    return (int*) numDet;
+}
 
-int UDPBaseImplementation::getDetectorPositionId() const{	FILE_LOG(logDEBUG) << __AT__ << " starting"; return detID;}
+int UDPBaseImplementation::getDetectorPositionId() const{
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    return detID;
+}
 
 char *UDPBaseImplementation::getDetectorHostname() const{
 	FILE_LOG(logDEBUG) << __AT__ << " starting";
@@ -117,9 +132,16 @@ int UDPBaseImplementation::getFlippedData(int axis) const{
 	return flippedData[axis];
 }
 
+bool UDPBaseImplementation::getGapPixelsEnable() const {
+	FILE_LOG(logDEBUG) << __AT__ << " starting";
+	return gapPixelsEnable;
+}
 
 /***file parameters***/
-slsReceiverDefs::fileFormat UDPBaseImplementation::getFileFormat() const{	FILE_LOG(logDEBUG) << __AT__ << " starting";	return fileFormatType;}
+slsReceiverDefs::fileFormat UDPBaseImplementation::getFileFormat() const{
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    return fileFormatType;
+}
 
 
 char *UDPBaseImplementation::getFileName() const{
@@ -148,30 +170,73 @@ char *UDPBaseImplementation::getFilePath() const{
 	return output;
 }
 
-uint64_t UDPBaseImplementation::getFileIndex() const{	FILE_LOG(logDEBUG) << __AT__ << " starting";	return fileIndex;}
+uint64_t UDPBaseImplementation::getFileIndex() const{
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    return fileIndex;
+}
 
-int UDPBaseImplementation::getScanTag() const{	FILE_LOG(logDEBUG) << __AT__ << " starting";	return scanTag;}
+uint32_t UDPBaseImplementation::getFramesPerFile() const{
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    return framesPerFile;
+}
 
-bool UDPBaseImplementation::getFrameIndexEnable() const{	FILE_LOG(logDEBUG) << __AT__ << " starting";	return frameIndexEnable;}
+slsReceiverDefs::frameDiscardPolicy UDPBaseImplementation::getFrameDiscardPolicy() const{
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    return frameDiscardMode;
+}
 
-bool UDPBaseImplementation::getFileWriteEnable() const{	FILE_LOG(logDEBUG) << __AT__ << " starting";	return fileWriteEnable;}
+bool UDPBaseImplementation::getFramePaddingEnable() const{
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    return framePadding;
+}
 
-bool UDPBaseImplementation::getOverwriteEnable() const{	FILE_LOG(logDEBUG) << __AT__ << " starting";	return overwriteEnable;}
+int UDPBaseImplementation::getScanTag() const{
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    return scanTag;
+}
 
-bool UDPBaseImplementation::getDataCompressionEnable() const{	FILE_LOG(logDEBUG) << __AT__ << " starting";	return dataCompressionEnable;}
+bool UDPBaseImplementation::getFileWriteEnable() const{
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    return fileWriteEnable;
+}
+
+bool UDPBaseImplementation::getOverwriteEnable() const{
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    return overwriteEnable;
+}
+
+bool UDPBaseImplementation::getDataCompressionEnable() const{
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    return dataCompressionEnable;
+}
 
 /***acquisition count parameters***/
-uint64_t UDPBaseImplementation::getTotalFramesCaught() const{	FILE_LOG(logDEBUG) << __AT__ << " starting";	return 0;}
+uint64_t UDPBaseImplementation::getTotalFramesCaught() const{
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    return 0;
+}
 
-uint64_t UDPBaseImplementation::getFramesCaught() const{	FILE_LOG(logDEBUG) << __AT__ << " starting";	return 0;}
+uint64_t UDPBaseImplementation::getFramesCaught() const{
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    return 0;
+}
 
-int64_t UDPBaseImplementation::getAcquisitionIndex() const{	FILE_LOG(logDEBUG) << __AT__ << " starting";	return -1;}
+int64_t UDPBaseImplementation::getAcquisitionIndex() const{
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    return -1;
+}
 
 
 /***connection parameters***/
-uint32_t UDPBaseImplementation::getUDPPortNumber() const{	FILE_LOG(logDEBUG) << __AT__ << " starting";	return udpPortNum[0];}
+uint32_t UDPBaseImplementation::getUDPPortNumber() const{
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    return udpPortNum[0];
+}
 
-uint32_t UDPBaseImplementation::getUDPPortNumber2() const{	FILE_LOG(logDEBUG) << __AT__ << " starting";	return udpPortNum[1];}
+uint32_t UDPBaseImplementation::getUDPPortNumber2() const{
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    return udpPortNum[1];
+}
 
 char *UDPBaseImplementation::getEthernetInterface() const{
 	FILE_LOG(logDEBUG) << __AT__ << " starting";
@@ -184,36 +249,122 @@ char *UDPBaseImplementation::getEthernetInterface() const{
 
 
 /***acquisition parameters***/
-int UDPBaseImplementation::getShortFrameEnable() const{	FILE_LOG(logDEBUG) << __AT__ << " starting";	return shortFrameEnable;}
+std::vector<slsReceiverDefs::ROI> UDPBaseImplementation::getROI() const{
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    return roi;
+}
 
-uint32_t UDPBaseImplementation::getFrameToGuiFrequency() const{	FILE_LOG(logDEBUG) << __AT__ << " starting";	return frameToGuiFrequency;}
+uint32_t UDPBaseImplementation::getFrameToGuiFrequency() const{
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    return frameToGuiFrequency;
+}
 
-uint32_t UDPBaseImplementation::getFrameToGuiTimer() const{	FILE_LOG(logDEBUG) << __AT__ << " starting";	return frameToGuiTimerinMS;}
+uint32_t UDPBaseImplementation::getFrameToGuiTimer() const{
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    return frameToGuiTimerinMS;
+}
 
-bool UDPBaseImplementation::getDataStreamEnable() const{	FILE_LOG(logDEBUG) << __AT__ << " starting";	return dataStreamEnable;}
+bool UDPBaseImplementation::getDataStreamEnable() const{
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    return dataStreamEnable;
+}
 
-uint64_t UDPBaseImplementation::getAcquisitionPeriod() const{	FILE_LOG(logDEBUG) << __AT__ << " starting";	return acquisitionPeriod;}
+uint64_t UDPBaseImplementation::getAcquisitionPeriod() const{
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    return acquisitionPeriod;
+}
 
-uint64_t UDPBaseImplementation::getAcquisitionTime() const{	FILE_LOG(logDEBUG) << __AT__ << " starting";	return acquisitionTime;}
+uint64_t UDPBaseImplementation::getAcquisitionTime() const{
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    return acquisitionTime;
+}
 
-uint64_t UDPBaseImplementation::getSubExpTime() const{	FILE_LOG(logDEBUG) << __AT__ << " starting";	return subExpTime;}
+uint64_t UDPBaseImplementation::getSubExpTime() const{
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    return subExpTime;
+}
 
-uint64_t UDPBaseImplementation::getNumberOfFrames() const{	FILE_LOG(logDEBUG) << __AT__ << " starting";	return numberOfFrames;}
+uint64_t UDPBaseImplementation::getSubPeriod() const{
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    return subPeriod;
+}
 
-uint32_t UDPBaseImplementation::getDynamicRange() const{	FILE_LOG(logDEBUG) << __AT__ << " starting";	return dynamicRange;}
+uint64_t UDPBaseImplementation::getNumberOfFrames() const{
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    return numberOfFrames;
+}
 
-bool UDPBaseImplementation::getTenGigaEnable() const{	FILE_LOG(logDEBUG) << __AT__ << " starting";	return tengigaEnable;}
+uint64_t UDPBaseImplementation::getNumberofSamples() const{
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    return numberOfSamples;
+}
 
-uint32_t UDPBaseImplementation::getFifoDepth() const{	FILE_LOG(logDEBUG) << __AT__ << " starting";	return fifoDepth;}
+uint32_t UDPBaseImplementation::getDynamicRange() const{
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    return dynamicRange;}
+
+bool UDPBaseImplementation::getTenGigaEnable() const{
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    return tengigaEnable;
+}
+
+uint32_t UDPBaseImplementation::getFifoDepth() const{
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    return fifoDepth;
+}
 
 /***receiver status***/
-slsReceiverDefs::runStatus UDPBaseImplementation::getStatus() const{	FILE_LOG(logDEBUG) << __AT__ << " starting";	return status;}
+slsReceiverDefs::runStatus UDPBaseImplementation::getStatus() const{
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    return status;}
 
-uint32_t UDPBaseImplementation::getSilentMode() const{	FILE_LOG(logDEBUG) << __AT__ << " starting";	return silentMode;}
+bool UDPBaseImplementation::getSilentMode() const{
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    return silentMode;}
 
-int UDPBaseImplementation::getActivate() const{FILE_LOG(logDEBUG) << __AT__ << " starting"; return activated;}
+bool UDPBaseImplementation::getActivate() const{
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    return activated;
+}
 
-uint32_t UDPBaseImplementation::getStreamingPort() const{FILE_LOG(logDEBUG) << __AT__ << " starting"; return streamingPort;}
+bool UDPBaseImplementation::getDeactivatedPadding() const{
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    return deactivatedPaddingEnable;
+}
+
+uint32_t UDPBaseImplementation::getStreamingPort() const{
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    return streamingPort;
+}
+
+char *UDPBaseImplementation::getStreamingSourceIP() const{
+	FILE_LOG(logDEBUG) << __AT__ << " starting";
+
+	char* output = new char[MAX_STR_LENGTH]();
+	strcpy(output,streamingSrcIP);
+	//freed by calling function
+	return output;
+}
+
+char *UDPBaseImplementation::getAdditionalJsonHeader() const{
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+
+    char* output = new char[MAX_STR_LENGTH]();
+    memset(output, 0, MAX_STR_LENGTH);
+    strcpy(output,additionalJsonHeader);
+    //freed by calling function
+    return output;
+}
+
+uint32_t UDPBaseImplementation::getUDPSocketBufferSize() const {
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    return udpSocketBufferSize;
+}
+
+uint32_t UDPBaseImplementation::getActualUDPSocketBufferSize() const {
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    return actualUDPSocketBufferSize;
+}
 
 /*************************************************************************
  * Setters ***************************************************************
@@ -221,7 +372,7 @@ uint32_t UDPBaseImplementation::getStreamingPort() const{FILE_LOG(logDEBUG) << _
  *************************************************************************/
 
 /**initial parameters***/
-void UDPBaseImplementation::configure(map<string, string> config_map){
+void UDPBaseImplementation::configure(std::map<std::string, std::string> config_map){
 	FILE_LOG(logERROR) << __AT__ << " doing nothing...";
 	FILE_LOG(logERROR) << __AT__ << " must be overridden by child classes";
 }
@@ -250,6 +401,14 @@ void UDPBaseImplementation::setFlippedData(int axis, int enable){
 	FILE_LOG(logINFO)  << "Flipped Data: " << flippedData[0] << " , " << flippedData[1];
 }
 
+int UDPBaseImplementation::setGapPixelsEnable(const bool b) {
+	FILE_LOG(logDEBUG) << __AT__ << " starting";
+	gapPixelsEnable = b;
+	FILE_LOG(logINFO)  << "Gap Pixels Enable: " << gapPixelsEnable;
+
+	// overridden
+	return OK;
+}
 
 /***file parameters***/
 void UDPBaseImplementation::setFileFormat(const fileFormat f){
@@ -290,7 +449,7 @@ void UDPBaseImplementation::setFilePath(const char c[]){
 		else
 			FILE_LOG(logERROR) << "FilePath does not exist: " << filePath;
 	}
-	FILE_LOG(logINFO) << "Info: File path: " << filePath;
+	FILE_LOG(logINFO) << "File path: " << filePath;
 }
 
 void UDPBaseImplementation::setFileIndex(const uint64_t i){
@@ -300,6 +459,29 @@ void UDPBaseImplementation::setFileIndex(const uint64_t i){
 	FILE_LOG(logINFO) << "File Index: " << fileIndex;
 }
 
+void UDPBaseImplementation::setFramesPerFile(const uint32_t i){
+	FILE_LOG(logDEBUG) << __AT__ << " starting";
+
+	framesPerFile = i;
+	FILE_LOG(logINFO) << "Frames per file: " << framesPerFile;
+}
+
+void UDPBaseImplementation::setFrameDiscardPolicy(const frameDiscardPolicy i){
+	FILE_LOG(logDEBUG) << __AT__ << " starting";
+
+	if (i >= 0 && i < NUM_DISCARD_POLICIES)
+		frameDiscardMode = i;
+
+	FILE_LOG(logINFO) << "Frame Discard Policy: " << getFrameDiscardPolicyType(frameDiscardMode);
+}
+
+void UDPBaseImplementation::setFramePaddingEnable(const bool i){
+	FILE_LOG(logDEBUG) << __AT__ << " starting";
+
+	framePadding = i;
+	FILE_LOG(logINFO) << "Frame Padding: " << framePadding;
+}
+
 //FIXME: needed?
 void UDPBaseImplementation::setScanTag(const int i){
 	FILE_LOG(logDEBUG) << __AT__ << " starting";
@@ -307,13 +489,6 @@ void UDPBaseImplementation::setScanTag(const int i){
 	scanTag = i;
 	FILE_LOG(logINFO) << "Scan Tag: " << scanTag;
 
-}
-
-void UDPBaseImplementation::setFrameIndexEnable(const bool b){
-	FILE_LOG(logDEBUG) << __AT__ << " starting";
-
-	frameIndexEnable = b;
-	FILE_LOG(logINFO) << "Frame Index Enable: " << stringEnable(frameIndexEnable);
 }
 
 void UDPBaseImplementation::setFileWriteEnable(const bool b){
@@ -365,11 +540,27 @@ void UDPBaseImplementation::setEthernetInterface(const char* c){
 
 
 /***acquisition parameters***/
-int UDPBaseImplementation::setShortFrameEnable(const int i){
+int UDPBaseImplementation::setROI(const std::vector<slsReceiverDefs::ROI> i){
 	FILE_LOG(logDEBUG) << __AT__ << " starting";
 
-	shortFrameEnable = i;
-	FILE_LOG(logINFO) << "Short Frame Enable: " << stringEnable(shortFrameEnable);
+	roi = i;
+
+	std::stringstream sstm;
+	sstm << "ROI: ";
+	if (!roi.size())
+		sstm << "0";
+	else {
+		for (unsigned int i = 0; i < roi.size(); ++i) {
+			sstm << "( " <<
+					roi[i].xmin << ", " <<
+					roi[i].xmax << ", " <<
+					roi[i].ymin << ", " <<
+					roi[i].ymax << " )";
+		}
+	}
+	std::string message = sstm.str();
+	FILE_LOG(logINFO) << message;
+
 	//overrridden child classes might return FAIL
 	return OK;
 }
@@ -430,11 +621,28 @@ void UDPBaseImplementation::setSubExpTime(const uint64_t i){
 	FILE_LOG(logINFO) << "Sub Exposure Time: " <<  (double)subExpTime/(1E9) << "s";
 }
 
+void UDPBaseImplementation::setSubPeriod(const uint64_t i){
+	FILE_LOG(logDEBUG) << __AT__ << " starting";
+
+	subPeriod = i;
+	FILE_LOG(logINFO) << "Sub Exposure Time: " <<  (double)subPeriod/(1E9) << "s";
+}
+
 int UDPBaseImplementation::setNumberOfFrames(const uint64_t i){
 	FILE_LOG(logDEBUG) << __AT__ << " starting";
 
 	numberOfFrames = i;
 	FILE_LOG(logINFO) << "Number of Frames: " << numberOfFrames;
+
+	//overrridden child classes might return FAIL
+	return OK;
+}
+
+int UDPBaseImplementation::setNumberofSamples(const uint64_t i){
+	FILE_LOG(logDEBUG) << __AT__ << " starting";
+
+	numberOfSamples = i;
+	FILE_LOG(logINFO) << "Number of Samples: " << numberOfSamples;
 
 	//overrridden child classes might return FAIL
 	return OK;
@@ -471,7 +679,7 @@ int UDPBaseImplementation::setFifoDepth(const uint32_t i){
 }
 
 /***receiver parameters***/
-void UDPBaseImplementation::setSilentMode(const uint32_t i){
+void UDPBaseImplementation::setSilentMode(const bool i){
 	FILE_LOG(logDEBUG) << __AT__ << " starting";
 
 	silentMode = i;
@@ -538,11 +746,6 @@ void UDPBaseImplementation::shutDownUDPSockets(){
 	FILE_LOG(logERROR) << __AT__ << " must be overridden by child classes";
 }
 
-void UDPBaseImplementation::readFrame(int ithread, char* c,char** raw, int64_t &startAcquisitionIndex, int64_t &startFrameIndex){
-	FILE_LOG(logERROR) << __AT__ << " doing nothing...";
-	FILE_LOG(logERROR) << __AT__ << " must be overridden by child classes";
-}
-
 
 //FIXME: needed, isnt stopReceiver enough?
 void UDPBaseImplementation::abort(){
@@ -551,21 +754,43 @@ void UDPBaseImplementation::abort(){
 }
 
 
-int UDPBaseImplementation::setActivate(int enable){
+bool UDPBaseImplementation::setActivate(bool enable){
 	FILE_LOG(logDEBUG) << __AT__ << " starting";
-
-	if(enable != -1){
-		activated = enable;
-		FILE_LOG(logINFO) << "Activation: " << stringEnable(activated);
-	}
-
+	activated = enable;
+	FILE_LOG(logINFO) << "Activation: " << stringEnable(activated);
 	return activated;
+}
+
+bool UDPBaseImplementation::setDeactivatedPadding(bool enable){
+	FILE_LOG(logDEBUG) << __AT__ << " starting";
+	deactivatedPaddingEnable = enable;
+	FILE_LOG(logINFO) << "Deactivated Padding Enable: " << stringEnable(deactivatedPaddingEnable);
+	return deactivatedPaddingEnable;
 }
 
 void UDPBaseImplementation::setStreamingPort(const uint32_t i) {
 	streamingPort = i;
 
 	FILE_LOG(logINFO) << "Streaming Port: " << streamingPort;
+}
+
+void UDPBaseImplementation::setStreamingSourceIP(const char c[]){
+	FILE_LOG(logDEBUG) << __AT__ << " starting";
+	strcpy(streamingSrcIP, c);
+	FILE_LOG(logINFO) << "Streaming Source IP: " << streamingSrcIP;
+}
+
+void UDPBaseImplementation::setAdditionalJsonHeader(const char c[]){
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+    strcpy(additionalJsonHeader, c);
+    FILE_LOG(logINFO) << "Additional JSON Header: " << additionalJsonHeader;
+}
+
+int UDPBaseImplementation::setUDPSocketBufferSize(const uint32_t s) {
+    FILE_LOG(logDEBUG) << __AT__ << " starting";
+
+    udpSocketBufferSize = s;
+    return OK;
 }
 
 
@@ -586,10 +811,15 @@ void UDPBaseImplementation::registerCallBackAcquisitionFinished(void (*func)(uin
 	pAcquisitionFinished=arg;
 }
 
-void UDPBaseImplementation::registerCallBackRawDataReady(void (*func)(uint64_t, uint32_t, uint32_t, uint64_t, uint64_t, uint16_t, uint16_t, uint16_t, uint16_t, uint32_t, uint16_t, uint8_t, uint8_t,
+void UDPBaseImplementation::registerCallBackRawDataReady(void (*func)(char* ,
 		char*, uint32_t, void*),void *arg){
 	rawDataReadyCallBack=func;
 	pRawDataReady=arg;
 }
 
+void UDPBaseImplementation::registerCallBackRawDataModifyReady(void (*func)(char* ,
+        char*, uint32_t&, void*),void *arg){
+    rawDataModifyReadyCallBack=func;
+    pRawDataReady=arg;
+}
 //#endif

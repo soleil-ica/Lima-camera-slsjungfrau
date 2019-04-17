@@ -49,6 +49,7 @@ qDrawPlot::~qDrawPlot(){
 	for(QVector<SlsQtH1D*>::iterator h = plot1D_hists.begin();h!=plot1D_hists.end();h++)	delete *h;
 	plot1D_hists.clear();
 	if(lastImageArray) delete[] lastImageArray; lastImageArray=0;
+	if(gainImageArray) delete[] gainImageArray; gainImageArray=0;
 	StartOrStopThread(0);
 	delete myDet; myDet = 0;
 	for(int i=0;i<MAXCloneWindows;i++) if(winClone[i]) {delete winClone[i]; winClone[i] = NULL;}
@@ -66,12 +67,17 @@ void qDrawPlot::SetupWidgetWindow(){
 	// Depending on whether the detector is 1d or 2d
 	detType = myDet->getDetectorsType();
 	switch(detType){
-	case slsDetectorDefs::MYTHEN:	originally2D = false;	break;
-	case slsDetectorDefs::EIGER:	originally2D = true;	break;
-	case slsDetectorDefs::GOTTHARD:	originally2D = false; 	break;
-	case slsDetectorDefs::PROPIX:	originally2D = true; 	break;
-	case slsDetectorDefs::MOENCH:	originally2D = true; 	break;
-	case slsDetectorDefs::JUNGFRAU:	originally2D = true; 	break;
+	case slsDetectorDefs::MYTHEN:
+	case slsDetectorDefs::GOTTHARD:
+		originally2D = false;
+		break;
+	case slsDetectorDefs::EIGER:
+	case slsDetectorDefs::PROPIX:
+	case slsDetectorDefs::MOENCH:
+	case slsDetectorDefs::JUNGFRAU:
+	case slsDetectorDefs::JUNGFRAUCTB:
+		originally2D = true;
+		break;
 	default:
 		cout << "ERROR: Detector Type is Generic" << endl;
 		exit(-1);
@@ -112,8 +118,18 @@ void qDrawPlot::SetupWidgetWindow(){
 	plotTitle = "";
 	plotTitle_prefix = "";
 	plot_in_scope   = 0;
-	nPixelsX = myDet->getTotalNumberOfChannels(slsDetectorDefs::X);		cout<<"nPixelsX:"<<nPixelsX<<endl;
-	nPixelsY = myDet->getTotalNumberOfChannels(slsDetectorDefs::Y);		cout<<"nPixelsY:"<<nPixelsY<<endl;
+
+	nPixelsX = myDet->getTotalNumberOfChannelsInclGapPixels(slsDetectorDefs::X);
+	nPixelsY = myDet->getTotalNumberOfChannelsInclGapPixels(slsDetectorDefs::Y);
+	if (detType == slsDetectorDefs::JUNGFRAUCTB) {
+		npixelsy_jctb = (myDet->setTimer(slsDetectorDefs::SAMPLES_JCTB, -1) * 2)/25;// for moench 03
+		nPixelsX = npixelsx_jctb;
+		nPixelsY = npixelsy_jctb;
+	}
+
+	cout<<"nPixelsX:"<<nPixelsX<<endl;
+	cout<<"nPixelsY:"<<nPixelsY<<endl;
+
 	nAnglePixelsX = 1;
 	minPixelsY = 0;
 	maxPixelsY = 0;
@@ -132,6 +148,7 @@ void qDrawPlot::SetupWidgetWindow(){
 	histYAngleAxis = 0;
 	histTrimbits=0;
 	lastImageArray = 0;
+	gainImageArray = 0;
 
 	persistency = 0;
 	currentPersistency = 0;
@@ -229,7 +246,7 @@ void qDrawPlot::SetupWidgetWindow(){
 		this->setLayout(layout);
 
 		histFrameIndexTitle = new QLabel("");
-
+		histFrameIndexTitle->setFixedHeight(10);
 	boxPlot = new QGroupBox("");
 		layout->addWidget(boxPlot,1,0);
 		boxPlot->setAlignment(Qt::AlignHCenter);
@@ -318,8 +335,28 @@ void qDrawPlot::SetupWidgetWindow(){
 
 	plotLayout =  new QGridLayout(boxPlot);
 	plotLayout->setContentsMargins(0,0,0,0);
-		plotLayout->addWidget(plot1D,0,0,1,1);
-		plotLayout->addWidget(plot2D,0,0,1,1);
+		plotLayout->addWidget(plot1D,0,0,4,4);
+		plotLayout->addWidget(plot2D,0,0,4,4);
+
+
+	//gainplot
+	gainplot2D = new SlsQt2DPlotLayout(boxPlot);
+	gainImageArray = new double[nPixelsY*nPixelsX];
+	for(unsigned int px=0;px<nPixelsX;px++)
+		for(unsigned int py=0;py<nPixelsY;py++)
+			gainImageArray[py*nPixelsX+px] = sqrt(pow(0+1,2)*pow(double(px)-nPixelsX/2,2)/pow(nPixelsX/2,2)/pow(1+1,2) + pow(double(py)-nPixelsY/2,2)/pow(nPixelsY/2,2))/sqrt(2);
+		gainplot2D->setFont(QFont("Sans Serif",9,QFont::Normal));
+		gainplot2D->GetPlot()->SetData(nPixelsX,-0.5,nPixelsX-0.5,nPixelsY,startPixel,endPixel,gainImageArray);
+		gainplot2D->setTitle(GetImageTitle());
+		gainplot2D->setAlignment(Qt::AlignLeft);
+		gainplot2D->GetPlot()->enableAxis(0,false);
+		gainplot2D->GetPlot()->enableAxis(1,false);
+		gainplot2D->GetPlot()->enableAxis(2,false);
+		plotLayout->addWidget(gainplot2D,0,4,1,1);
+		gainplot2D->hide();
+		gainPlotEnable = false;
+		gainDataEnable = false;
+
 
 
 	// callbacks
@@ -347,11 +384,10 @@ void qDrawPlot::Initialization(){
 	connect(this, 		SIGNAL(LogySignal(bool)),		plot1D, 	SLOT(SetLogY(bool)));
 	connect(this, 		SIGNAL(ResetZMinZMaxSignal(bool,bool,double,double)),plot2D, 	SLOT(ResetZMinZMax(bool,bool,double,double)));
 
-	connect(this, 		SIGNAL(SetZRangeSignal(double,double)),	plot2D, 	SLOT(SetZRange(double,double)));
-
 	connect(this, 		SIGNAL(AcquisitionErrorSignal(QString)),	this, 	SLOT(ShowAcquisitionErrorMessage(QString)));
 
 
+	connect(this, 		SIGNAL(GainPlotSignal(bool)),	this, 	SLOT(EnableGainPlot(bool)));
 }
 
 
@@ -527,9 +563,13 @@ void qDrawPlot::SetScanArgument(int scanArg){
 	// Number of Exposures - must be calculated here to get npixelsy for allframes/frameindex scans
 	int numFrames = (isFrameEnabled)*((int)myDet->setTimer(slsDetectorDefs::FRAME_NUMBER,-1));
 	int numTriggers = (isTriggerEnabled)*((int)myDet->setTimer(slsDetectorDefs::CYCLES_NUMBER,-1));
+	int numStoragecells = 0;
+	if (detType == slsDetectorDefs::JUNGFRAU)
+	    numStoragecells = (int)myDet->setTimer(slsDetectorDefs::STORAGE_CELL_NUMBER, -1);
 	numFrames = ((numFrames==0)?1:numFrames);
 	numTriggers = ((numTriggers==0)?1:numTriggers);
-	number_of_frames = numFrames * numTriggers;
+	numStoragecells = ((numStoragecells<=0)?1:numStoragecells+1);
+	number_of_frames = numFrames * numTriggers * numStoragecells;
 	cout << "\tNumber of Frames per Scan/Measurement:" << number_of_frames << endl;
 	//get #scansets for level 0 and level 1
 	int numScan0 = myDet->getScanSteps(0);	numScan0 = ((numScan0==0)?1:numScan0);
@@ -543,8 +583,14 @@ void qDrawPlot::SetScanArgument(int scanArg){
 
 	maxPixelsY = 0;
 	minPixelsY = 0;
-	nPixelsX = myDet->getTotalNumberOfChannels(slsDetectorDefs::X);
-	nPixelsY = myDet->getTotalNumberOfChannels(slsDetectorDefs::Y);
+	nPixelsX = myDet->getTotalNumberOfChannelsInclGapPixels(slsDetectorDefs::X);
+	nPixelsY = myDet->getTotalNumberOfChannelsInclGapPixels(slsDetectorDefs::Y);
+	if (detType == slsDetectorDefs::JUNGFRAUCTB) {
+		npixelsy_jctb = (myDet->setTimer(slsDetectorDefs::SAMPLES_JCTB, -1) * 2)/25; // for moench 03
+		nPixelsX = npixelsx_jctb;
+		nPixelsY = npixelsy_jctb;
+	}
+
 	//cannot do this in between measurements , so update instantly
 	if(scanArgument==qDefs::Level0){
 		//no need to check if numsteps=0,cuz otherwise this mode wont be set in plot tab
@@ -585,15 +631,21 @@ void qDrawPlot::SetScanArgument(int scanArg){
 
 	//2d
 	if(lastImageArray) delete [] lastImageArray; lastImageArray = new double[nPixelsY*nPixelsX];
+	if(gainImageArray) delete [] gainImageArray; gainImageArray = new double[nPixelsY*nPixelsX];
 
 	//initializing 1d x axis
 	for(unsigned int px=0;px<nPixelsX;px++)	histXAxis[px]  = px;/*+10;*/
 
 	//initializing 2d array
-	for(unsigned int py=0;py<nPixelsY;py++)
-		for(unsigned int px=0;px<nPixelsX;px++)
-			lastImageArray[py*nPixelsX+px] = 0;
 
+	memset(lastImageArray,0,nPixelsY *nPixelsX * sizeof(double));
+	memset(gainImageArray,0,nPixelsY *nPixelsX * sizeof(double));
+	/*for(int py=0;py<(int)nPixelsY;py++)
+		for(int px=0;px<(int)nPixelsX;px++) {
+			lastImageArray[py*nPixelsX+px] = 0;
+			gainImageArray[py*nPixelsX+px] = 0;
+		}
+	 */
 
 	//histogram
 	if(histogram){
@@ -646,10 +698,15 @@ void qDrawPlot::SetupMeasurement(){
 		if(!running)
 		  lastImageNumber = 0;/**Just now */
 	//initializing 2d array
-	for(unsigned int py=0;py<nPixelsY;py++)
-		for(unsigned int px=0;px<nPixelsX;px++)
+	memset(lastImageArray,0,nPixelsY *nPixelsX * sizeof(double));
+	memset(gainImageArray,0,nPixelsY *nPixelsX * sizeof(double));
+	/*
+	for(int py=0;py<(int)nPixelsY;py++)
+		for(int px=0;px<(int)nPixelsX;px++) {
 			lastImageArray[py*nPixelsX+px] = 0;
-
+			gainImageArray[py*nPixelsX+px] = 0;
+			}
+	 */
 	//1d with no scan
 	if ((!originally2D) && (scanArgument==qDefs::None)){
 #ifdef VERYVERBOSE
@@ -668,7 +725,7 @@ void qDrawPlot::SetupMeasurement(){
 #endif
 		//2d with no scan
 		if ((originally2D) && (scanArgument==qDefs::None)){
-			maxPixelsY = nPixelsY;
+			maxPixelsY = nPixelsY-1;
 			minPixelsY = 0;
 		}
 
@@ -772,16 +829,20 @@ int qDrawPlot::GetData(detectorData *data,int fIndex, int subIndex){
 	cout << "fname " << data->fileName << endl;
 	cout << "npoints " << data->npoints << endl;
 	cout << "npy " << data->npy << endl;
-	cout << "npy " << data->progressIndex << endl;
-	cout << "values " << data->values << endl;
+	cout << "progress " << data->progressIndex << endl;
+	if (data->values != NULL) cout << "values " << data->values << endl;
 	cout << "errors " << data->errors << endl;
 	cout << "angle " << data->angles << endl;
+	cout << "databytes " << data->databytes << endl;
+	cout << "dynamicRange " << data->dynamicRange << endl;
+	cout << "fileIndex " << data->fileIndex << endl;
 #endif
 	if(!stop_signal){
 
 		//set progress
 		progress=(int)data->progressIndex;
 		currentFrameIndex = fileIOStatic::getIndicesFromFileName(string(data->fileName),currentFileIndex);
+		currentFileIndex = data->fileIndex;
 		//happens if receiver sends a null and empty file name
 		/*if(string(data->fileName).empty()){
 			cout << "Received empty file name. Exiting function without updating data for plot." << endl;
@@ -810,8 +871,16 @@ int qDrawPlot::GetData(detectorData *data,int fIndex, int subIndex){
 			return 0;
 
 
+
 		//angle plotting
 		if(anglePlot){
+
+			// convert char* to double
+			if(data->values==NULL) {
+				data->values = new double[nPixelsX*nPixelsY];
+				toDoublePixelData(data->values, data->cvalues, nPixelsX*nPixelsY, data->databytes, data->dynamicRange);
+			}
+
 			LockLastImageArray();
 			//set title
 			plotTitle=QString(plotTitle_prefix)+QString(data->fileName).section('/',-1);
@@ -899,6 +968,16 @@ int qDrawPlot::GetData(detectorData *data,int fIndex, int subIndex){
 			}
 		}
 
+		// convert char* to double
+		if(data->values == NULL) {
+			data->values = new double[nPixelsX*nPixelsY];
+			if (gainDataEnable) {
+				data->dgainvalues = new double[nPixelsX*nPixelsY];
+				toDoublePixelData(data->values, data->cvalues, nPixelsX*nPixelsY, data->databytes, data->dynamicRange, data->dgainvalues);
+			}
+			else
+				toDoublePixelData(data->values, data->cvalues, nPixelsX*nPixelsY, data->databytes, data->dynamicRange);
+		}
 
 		//if scan
 		//alframes
@@ -1128,6 +1207,15 @@ int qDrawPlot::GetData(detectorData *data,int fIndex, int subIndex){
 		else{
 			// Titles
 			imageTitle = temp_title;
+
+			//jungfrau mask gain
+			if(data->dgainvalues != NULL) {
+				memcpy(gainImageArray, data->dgainvalues, nPixelsX*nPixelsY*sizeof(double));
+				gainPlotEnable = true;
+			}else
+				gainPlotEnable = false;
+
+
 			//recalculating pedestal
 			if(startPedestalCal){
 				//start adding frames to get to the pedestal value
@@ -1212,7 +1300,6 @@ int qDrawPlot::AcquisitionFinished(double currentProgress, int detectorStatus){
 #ifdef VERBOSE
 	cout << "\nEntering Acquisition Finished with status " ;
 #endif
-	emit AcquisitionFinishedSignal();
 	QString status = QString(slsDetectorBase::runStatusType(slsDetectorDefs::runStatus(detectorStatus)).c_str());
 #ifdef VERBOSE
   cout << status.toAscii().constData() << " and progress " << currentProgress << endl;
@@ -1463,6 +1550,13 @@ void qDrawPlot::UpdatePlot(){
 						plot2D->SetYTitle(imageYAxisTitle);
 						plot2D->SetZTitle(imageZAxisTitle);
 						plot2D->UpdateNKeepSetRangeIfSet(); //keep a "set" z range, and call Update();
+						if (gainPlotEnable) {
+							gainplot2D->GetPlot()->SetData(nPixelsX,-0.5,nPixelsX-0.5,nPixelsY,startPixel,endPixel,gainImageArray);
+							gainplot2D->setTitle(GetImageTitle());
+							gainplot2D->show();
+						}else {
+							gainplot2D->hide();
+						}
 					}
 					// update range if required
 					if(XYRangeChanged){
@@ -1472,9 +1566,18 @@ void qDrawPlot::UpdatePlot(){
 						if(!IsXYRange[qDefs::YMAXIMUM])			XYRangeValues[qDefs::YMAXIMUM]= plot2D->GetPlot()->GetYMaximum();
 						plot2D->GetPlot()->SetXMinMax(XYRangeValues[qDefs::XMINIMUM],XYRangeValues[qDefs::XMAXIMUM]);
 						plot2D->GetPlot()->SetYMinMax(XYRangeValues[qDefs::YMINIMUM],XYRangeValues[qDefs::YMAXIMUM]);
+						gainplot2D->GetPlot()->SetXMinMax(XYRangeValues[qDefs::XMINIMUM],XYRangeValues[qDefs::XMAXIMUM]);
+						gainplot2D->GetPlot()->SetYMinMax(XYRangeValues[qDefs::YMINIMUM],XYRangeValues[qDefs::YMAXIMUM]);
 						XYRangeChanged	= false;
 					}
 					plot2D->GetPlot()->Update();
+					if (gainPlotEnable) {
+						gainplot2D->GetPlot()->Update();
+						gainplot2D->setFixedWidth(plot2D->width()/4);
+						gainplot2D->setFixedHeight(plot2D->height()/4);
+						gainplot2D->show();
+					}else
+						gainplot2D->hide();
 					//Display Statistics
 					if(displayStatistics){
 						double min=0,max=0,sum=0;
@@ -1859,9 +1962,12 @@ int qDrawPlot::UpdateTrimbitPlot(bool fromDetector,bool Histogram){
 		nPixelsY = 100;
 		if(lastImageArray) delete [] lastImageArray; lastImageArray = new double[nPixelsY*nPixelsX];
 		//initializing 2d array
+		memset(lastImageArray, 0 ,nPixelsY * nPixelsX * sizeof(double));
+		/*
 		for(int py=0;py<(int)nPixelsY;py++)
 			for(int px=0;px<(int)nPixelsX;px++)
 				lastImageArray[py*nPixelsX+px] = 0;
+				*/
 		//get trimbits
 		ret = 1;/*myDet->getChanRegs(lastImageArray,fromDetector);*/
 		if(!ret){
@@ -2071,3 +2177,99 @@ void qDrawPlot::GetStatistics(double &min, double &max, double &sum, double* arr
 
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+void qDrawPlot::EnableGainPlot(bool e) {
+#ifdef VERBOSE
+	cout << "Setting Gain Data enable to " << e << endl;
+#endif
+	gainDataEnable = e;
+}
+
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+
+void qDrawPlot::toDoublePixelData(double* dest, char* source,int size, int databytes, int dr, double* gaindest) {
+	int ichan=0;
+	int ibyte=0;
+	int halfbyte=0;
+	char cbyte = '\0';
+	int mask=0x00ffffff;
+
+	switch(dr) {
+
+	case 4:
+		for (ibyte = 0; ibyte < databytes; ++ibyte) {
+			cbyte = source[ibyte];
+			for (halfbyte = 1; halfbyte >= 0; --halfbyte) {
+				dest[ichan] = (cbyte >> (halfbyte * 4)) & 0xf;
+				++ichan;
+			}
+		}
+		break;
+
+	case 8:
+		for (ichan = 0; ichan < databytes; ++ichan) {
+			dest[ichan] = *((u_int8_t*)source);
+			++source;
+		}
+		break;
+
+	case 16:
+		if (detType == slsDetectorDefs::JUNGFRAU || detType == slsDetectorDefs::JUNGFRAUCTB) {
+
+			// show gain plot
+			if(gaindest!=NULL) {
+				for (ichan = 0; ichan < size; ++ichan) {
+					if (  (*((u_int16_t*)source)) == 0xFFFF  ) {
+						gaindest[ichan] = 0xFFFF;
+						dest[ichan] = 0xFFFF;
+					}
+					else{
+						gaindest[ichan] = (((*((u_int16_t*)source)) & 0xC000) >> 14);
+						dest[ichan] = ((*((u_int16_t*)source)) & 0x3FFF);
+					}
+					source += 2;
+				}
+			}
+
+			// only data plot
+			else {
+				for (ichan = 0; ichan < size; ++ichan) {
+					/*if (  (*((u_int16_t*)source)) == 0xFFFF  )
+						dest[ichan] = 0xFFFF;
+					else*/
+						dest[ichan] = ((*((u_int16_t*)source)) & 0x3FFF);
+					source += 2;
+				}
+			}
+			break;
+		}
+
+
+		// other detectors
+		for (ichan = 0; ichan < size; ++ichan) {
+			dest[ichan] = *((u_int16_t*)source);
+			source += 2;
+		}
+		break;
+
+	default:
+		if (detType == slsDetectorDefs::MYTHEN) {
+			for (ichan = 0; ichan < size; ++ichan) {
+				dest[ichan] = (*((u_int32_t*)source) & mask);
+				source += 4;
+			}
+			break;
+		}
+
+		// other detectors
+		for (ichan = 0; ichan < size; ++ichan) {
+			dest[ichan] = *((u_int32_t*)source);
+			source += 4;
+		}
+		break;
+	}
+
+}
+

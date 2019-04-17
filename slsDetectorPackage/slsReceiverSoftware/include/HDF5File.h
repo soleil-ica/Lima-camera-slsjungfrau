@@ -17,7 +17,6 @@
 #ifndef H5_NO_NAMESPACE
     using namespace H5;
 #endif
-#include <string>
 
 
 class HDF5File : private virtual slsReceiverDefs, public File, public HDF5FileStatic {
@@ -27,13 +26,11 @@ class HDF5File : private virtual slsReceiverDefs, public File, public HDF5FileSt
 	 * Constructor
 	 * creates the File Writer
 	 * @param ind self index
-	 * @param maxf max frames per file
-	 * @param ppf packets per frame
+	 * @param maxf pointer to max frames per file
 	 * @param nd pointer to number of detectors in each dimension
 	 * @param fname pointer to file name prefix
 	 * @param fpath pointer to file path
 	 * @param findex pointer to file index
-	 * @param frindexenable pointer to frame index enable
 	 * @param owenable pointer to over write enable
 	 * @param dindex pointer to detector index
 	 * @param nunits pointer to number of theads/ units per detector
@@ -44,9 +41,8 @@ class HDF5File : private virtual slsReceiverDefs, public File, public HDF5FileSt
 	 * @param ny number of pixels in y direction
 	 * @param smode pointer to silent mode
 	 */
-	HDF5File(int ind, uint32_t maxf, const uint32_t* ppf,
-			int* nd, char* fname, char* fpath, uint64_t* findex,
-			bool* frindexenable, bool* owenable,
+	HDF5File(int ind, uint32_t* maxf,
+			int* nd, char* fname, char* fpath, uint64_t* findex, bool* owenable,
 			int* dindex, int* nunits, uint64_t* nf, uint32_t* dr, uint32_t* portno,
 			uint32_t nx, uint32_t ny,
 			bool* smode);
@@ -102,18 +98,24 @@ class HDF5File : private virtual slsReceiverDefs, public File, public HDF5FileSt
 	 * @param nx number of pixels in x direction
 	 * @param ny number of pixels in y direction
 	 * @param at acquisition time
-	  * @param at sub exposure time
+	 * @param st sub exposure time
+	 * @param sp sub period
 	 * @param ap acquisition period
 	 * @returns OK or FAIL
 	 */
 	int CreateMasterFile(bool en, uint32_t size,
-			uint32_t nx, uint32_t ny, uint64_t at, uint64_t st, uint64_t ap);
+			uint32_t nx, uint32_t ny, uint64_t at, uint64_t st, uint64_t sp,
+			uint64_t ap);
 
 	/**
 	 * End of Acquisition
+	 * @param anyPacketsCaught true if any packets are caught, else false
 	 * @param numf number of images caught
 	 */
-	void EndofAcquisition(uint64_t numf);
+	void EndofAcquisition(bool anyPacketsCaught, uint64_t numf);
+
+
+ private:
 
 	/**
 	 * Create Virtual File
@@ -122,8 +124,12 @@ class HDF5File : private virtual slsReceiverDefs, public File, public HDF5FileSt
 	 */
 	int CreateVirtualFile(uint64_t numf);
 
-
- private:
+	/**
+	 * Link virtual file in master file
+	 * Only for Jungfrau at the moment for 1 module and 1 data file
+	 * @returns OK or FAIL
+	 */
+	int LinkVirtualFileinMasterFile();
 
 	/**
 	 * Get Type
@@ -174,11 +180,20 @@ class HDF5File : private virtual slsReceiverDefs, public File, public HDF5FileSt
 	/** Number of files in an acquisition - to verify need of virtual file */
 	int numFilesinAcquisition;
 
+	/** parameter names */
+	std::vector <const char*> parameterNames;
+
+	/** parameter data types */
+	std::vector <DataType> parameterDataTypes;
+
 	/** Dataspace of parameters */
 	DataSpace* dataspace_para;
 
 	/** Dataset array for parameters */
-	DataSet* dataset_para[HDF5FileStatic::NumberofParameters];
+	std::vector <DataSet*> dataset_para;
+
+	/** Number of Images (including extended during acquisition) */
+	uint64_t extNumImages;
 
 };
 #endif

@@ -1,6 +1,6 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
 
-<!--Converted with LaTeX2HTML 2008 (1.71)
+<!--Converted with LaTeX2HTML 2012 (1.2)
 original version by:  Nikos Drakos, CBLU, University of Leeds
 * revised and updated by:  Marcus Hennecke, Ross Moore, Herb Swan
 * with significant contributions from:
@@ -13,7 +13,7 @@ original version by:  Nikos Drakos, CBLU, University of Leeds
 <META NAME="resource-type" CONTENT="document">
 <META NAME="distribution" CONTENT="global">
 
-<META NAME="Generator" CONTENT="LaTeX2HTML v2008">
+<META NAME="Generator" CONTENT="LaTeX2HTML v2012">
 <META HTTP-EQUIV="Content-Style-Type" CONTENT="text/css">
 
 <LINK REL="STYLESHEET" HREF="slsDetectorInstall.css">
@@ -33,14 +33,11 @@ One can use the <code>cleansharedmemory.sh</code> script available under the
 slsDetector Package.
 
 <P>
-One can also just use the following commands to clean the shared memory
-segments one by one.
-<PRE>
-#displays list of shared memeory segments 
-ipcs -m
-#remove segments that have nattach equal to zero. They key is the first column
-ipcrm -M [key]
-</PRE>
+One can also just delete the files that are typically located under /dev/shm/ folder
+and starts with slsDetectorPackage.
+
+<P>
+One no longer has to delete segments using ipcs.
 
 <P>
 <BR><HR>

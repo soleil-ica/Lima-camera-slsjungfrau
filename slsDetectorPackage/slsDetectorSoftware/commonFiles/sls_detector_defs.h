@@ -22,6 +22,9 @@
 /** maximum rois */
 #define MAX_ROIS 100
 
+/** maximum trim en */
+#define MAX_TRIMEN 100
+
 /** maximum unit size of program sent to detector */
 #define MAX_FPGAPROGRAMSIZE (2 * 1024 *1024)
 
@@ -143,19 +146,6 @@ typedef struct {
 } sls_detector_module;
 
 
-/**
-    @short structure for a region of interest
-
-    xmin,xmax,ymin,ymax define the limits of the region
-*/
-typedef struct {
-  int xmin;  /**< is the roi xmin (in channel number) */
-  int xmax;  /**< is the roi xmax  (in channel number)*/
-  int ymin;  /**< is the roi ymin  (in channel number)*/
-  int ymax;   /**< is the roi ymax  (in channel number)*/
-} ROI ;
-
-
 /* /\*  */
 /*     @short structure for a generic integer array */
 /* *\/ */
@@ -194,7 +184,12 @@ enum networkParameter {
   FLOW_CONTROL_WR_PTR,		/**< memory write pointer for flow control */
   FLOW_CONTROL_RD_PTR,		/**< memory read pointer for flow control */
   RECEIVER_STREAMING_PORT,	/**< receiever streaming TCP(ZMQ) port */
-  CLIENT_STREAMING_PORT		/**< client streaming TCP(ZMQ) port */
+  CLIENT_STREAMING_PORT,	/**< client streaming TCP(ZMQ) port */
+  RECEIVER_STREAMING_SRC_IP,/**< receiever streaming TCP(ZMQ) ip */
+  CLIENT_STREAMING_SRC_IP,	/**< client streaming TCP(ZMQ) ip */
+  ADDITIONAL_JSON_HEADER,    /**< additional json header (ZMQ) */
+  RECEIVER_UDP_SCKT_BUF_SIZE, /**< UDP socket buffer size */
+  RECEIVER_REAL_UDP_SCKT_BUF_SIZE /**< real UDP socket buffer size */
 };
 
 /**
@@ -286,7 +281,9 @@ enum idMode{
   DETECTOR_SOFTWARE_VERSION,   /**<return detector system software version */
   THIS_SOFTWARE_VERSION,  /**<return this software version */
   RECEIVER_VERSION,		 /**<return receiver software version */
-  SOFTWARE_FIRMWARE_API_VERSION		/** return software firmware API version **/
+  SOFTWARE_FIRMWARE_API_VERSION,		/** return software firmware API version **/
+  CLIENT_SOFTWARE_API_VERSION,	/** return detector software and client api version */
+  CLIENT_RECEIVER_API_VERSION /** return client and  receiver api version */
 };
 /**
     detector digital test modes
@@ -369,6 +366,18 @@ enum dacIndex {
   TEMPERATURE_SODR,		/**< temperature sensor (close to SODR) */
   TEMPERATURE_FPGA2, /**< temperature sensor (fpga2 (eiger:febl) */
   TEMPERATURE_FPGA3, /**< temperature sensor (fpga3 (eiger:febr) */
+  M_vIpre,      /**< mythen 3 >*/
+  M_vIbias,     /**< mythen 3 >*/
+  M_vIinSh,     /**< mythen 3 >*/
+  M_VdcSh,      /**< mythen 3 >*/
+  M_Vth2,       /**< mythen 3 >*/
+  M_VPL,        /**< mythen 3 >*/
+  M_Vth3,       /**< mythen 3 >*/
+  M_casSh,      /**< mythen 3 >*/
+  M_cas,        /**< mythen 3 >*/
+  M_vIbiasSh,   /**< mythen 3 >*/
+  M_vIcin,      /**< mythen 3 >*/
+  M_vIpreOut,    /**< mythen 3 >*/
   V_POWER_A = 100, /**new chiptest board */
   V_POWER_B = 101, /**new chiptest board */
   V_POWER_C = 102, /**new chiptest board */
@@ -473,6 +482,8 @@ enum readOutFlags {
   DIGITAL_ONLY=0x80000, /** chiptest board read only digital bits (not adc values)*/
   ANALOG_AND_DIGITAL=0x100000, /** chiptest board read adc values and digital bits digital bits */
   DUT_CLK=0x200000, /** chiptest board fifo clock comes from device under test */
+  SHOW_OVERFLOW=0x400000, /** eiger 32 bit mode, show saturated for overflow of single subframes */
+  NOOVERFLOW=0x800000 /** eiger 32 bit mode, do not show saturated for overflow of single subframes */
 };
 /**
    trimming modes

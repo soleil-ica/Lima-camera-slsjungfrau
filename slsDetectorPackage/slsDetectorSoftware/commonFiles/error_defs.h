@@ -15,7 +15,7 @@
 #include <string>
 #include <cstring>
 #include <iostream>
-using namespace std;
+// 
 
 /** Error flags */
 /*Assumption: Only upto 63 detectors */
@@ -24,6 +24,7 @@ using namespace std;
 //											0xFFF0000000000000ULL
 #define MULTI_DETECTORS_NOT_ADDED			0x8000000000000000ULL
 #define MULTI_HAVE_DIFFERENT_VALUES			0x4000000000000000ULL
+#define MULTI_CONFIG_FILE_ERROR             0x2000000000000000ULL
 
 // sls errors
 #define CRITICAL_ERROR_MASK 				0xFFFFFFF
@@ -50,6 +51,7 @@ using namespace std;
 #define PREPARE_ACQUISITION					0x0000100000000000ULL
 #define CLEANUP_ACQUISITION					0x0000080000000000ULL
 #define REGISER_WRITE_READ					0x0000040000000000ULL
+#define VERSION_COMPATIBILITY				0x0000020000000000ULL
 //											0xFFFFFF0000000000ULL
 
 //											0x000000FFFFFFFFFFULL
@@ -85,12 +87,16 @@ using namespace std;
 #define RECEIVER_FLIPPED_DATA_NOT_SET		0x0000000020000000ULL
 #define THRESHOLD_NOT_SET					0x0000000040000000ULL
 #define RECEIVER_FILE_FORMAT				0x0000000080000000ULL
-#define RECEIVER_SUBF_TIME_NOT_SET			0x0000000100000000ULL
-#define RECEIVER_SILENT_MODE_NOT_SET		0x0000000200000000ULL
-#define RESTREAM_STOP_FROM_RECEIVER			0x0000000400000000ULL
-#define TEMPERATURE_CONTROL                 0x0000000800000000ULL
-#define AUTO_COMP_DISABLE                   0x0000001000000000ULL
+#define RECEIVER_PARAMETER_NOT_SET			0x0000000100000000ULL
+#define RECEIVER_TIMER_NOT_SET				0x0000000200000000ULL
+#define RECEIVER_ENABLE_GAPPIXELS_NOT_SET	0x0000000400000000ULL
+#define RESTREAM_STOP_FROM_RECEIVER			0x0000000800000000ULL
+#define TEMPERATURE_CONTROL                 0x0000001000000000ULL
+#define AUTO_COMP_DISABLE                   0x0000002000000000ULL
+#define CONFIG_FILE                         0x0000004000000000ULL
+#define STORAGE_CELL_START                  0x0000008000000000ULL
 //											0x000000FFFFFFFFFFULL
+
 
 /** @short class returning all error messages for error mask */
 class errorDefs {
@@ -107,9 +113,9 @@ public:
 	 * param errorMask error mask
 	 /returns error message from error mask
 	*/
-	static string getErrorMessage(int64_t slsErrorMask){
+	static std::string getErrorMessage(int64_t slsErrorMask){
 
-		string retval = "";
+		std::string retval = "";
 
 		if(slsErrorMask&CANNOT_CONNECT_TO_DETECTOR)
 			retval.append("Cannot connect to Detector\n");
@@ -165,13 +171,16 @@ public:
 		if(slsErrorMask&REGISER_WRITE_READ)
 			retval.append("Could not read/write register in detector\n");
 
+		if(slsErrorMask&VERSION_COMPATIBILITY)
+			retval.append("Incompatible versions with detector or receiver. Please check log for more details.\n");
+
 
 
 		if(slsErrorMask&COULD_NOT_CONFIGURE_MAC)
 			retval.append("Could not configure mac\n");
 
 		if(slsErrorMask&COULDNOT_SET_NETWORK_PARAMETER)
-			retval.append("Could not set network parameter. Should be valid and in proper format\n");
+			retval.append("Could not set network parameter.\n");
 
 		if(slsErrorMask&COULDNOT_SET_ROI)
 			retval.append("Could not set the exact region of interest. Verify ROI set by detector.\n");
@@ -269,11 +278,14 @@ public:
 		if(slsErrorMask&RECEIVER_FILE_FORMAT)
 			retval.append("Could not set receiver file format\n");
 
-		if(slsErrorMask&RECEIVER_SUBF_TIME_NOT_SET)
-			retval.append("Could not set sub exposure time in receiver.\n");
+		if(slsErrorMask&RECEIVER_TIMER_NOT_SET)
+			retval.append("Could not set timer in receiver.\n");
 
-		if(slsErrorMask&RECEIVER_SILENT_MODE_NOT_SET)
-			retval.append("Could not set silent mode in receiver.\n");
+		if(slsErrorMask&RECEIVER_PARAMETER_NOT_SET)
+			retval.append("Could not set a paramater in receiver.\n");
+
+		if(slsErrorMask&RECEIVER_ENABLE_GAPPIXELS_NOT_SET)
+			retval.append("Could not enable/disable gap pixels in receiver.\n");
 
 		if(slsErrorMask&RESTREAM_STOP_FROM_RECEIVER)
 				retval.append("Could not restream stop from receiver.\n");
@@ -283,6 +295,9 @@ public:
 
         if(slsErrorMask&AUTO_COMP_DISABLE)
                 retval.append("Could not set/get auto comparator disable\n");
+
+        if(slsErrorMask&CONFIG_FILE)
+                retval.append("Could not load/write config file\n");
 
 		//------------------------------------------------------ length of message
 

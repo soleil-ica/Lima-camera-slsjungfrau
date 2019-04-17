@@ -10,4 +10,10 @@ No implementation found for style `framed'
 
 Substitution of arg to newlabelxx delayed.
 
+redefining command \ 
+
+? brace missing for \oldcontentsline
+
+? brace missing for \oldnewlabel
+
 ? brace missing for \textit

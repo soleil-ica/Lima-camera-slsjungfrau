@@ -1,4 +1,4 @@
-# LaTeX2HTML 2008 (1.71)
+# LaTeX2HTML 2012 (1.2)
 # Associate internals original text with physical files.
 
 
@@ -34,12 +34,12 @@ $key = q/fig:guiencallog/;
 $ref_files{$key} = "$dir".q|node2.html|; 
 $noresave{$key} = "$nosave";
 
-$key = q/fig:addenergy/;
-$ref_files{$key} = "$dir".q|node3.html|; 
-$noresave{$key} = "$nosave";
-
 $key = q/fig:thrscanexpl/;
 $ref_files{$key} = "$dir".q|node1.html|; 
+$noresave{$key} = "$nosave";
+
+$key = q/fig:addenergy/;
+$ref_files{$key} = "$dir".q|node3.html|; 
 $noresave{$key} = "$nosave";
 
 $key = q/fig:expthrscan/;

@@ -12,6 +12,7 @@
 u_int64_t CSP0BASE = 0;
 #define CSP0 0x20200000
 #define MEM_SIZE 0x100000
+#define MEM_MAP_SHIFT 1
 
 
 
@@ -72,7 +73,7 @@ int64_t get64BitReg(int aLSB, int aMSB){
 	vMSB=bus_r(aMSB);
 	v64=vMSB;
 	v64=(v64<<32) | vLSB;
-	printf(" reg64(%x,%x) %x %x %llx\n", aLSB, aMSB, vLSB, vMSB, v64);
+	printf(" reg64(%x,%x) %x %x %llx\n", aLSB, aMSB, vLSB, vMSB, (long long unsigned int)v64);
 	return v64;
 }
 
@@ -103,7 +104,7 @@ int64_t set64BitReg(int64_t value, int aLSB, int aMSB){
  * @retuns 32 bit data read
  */
 u_int32_t readRegister(u_int32_t offset) {
-	return bus_r(offset << 11);
+	return bus_r(offset << MEM_MAP_SHIFT);
 }
 
 /**
@@ -112,7 +113,7 @@ u_int32_t readRegister(u_int32_t offset) {
  * @param data 32 bit data
  */
 u_int32_t writeRegister(u_int32_t offset, u_int32_t data) {
-	bus_w(offset << 11, data);
+	bus_w(offset << MEM_MAP_SHIFT, data);
 	return readRegister(offset);
 }
 
@@ -147,7 +148,9 @@ int mapCSP0(void) {
 			return FAIL;
 		}
 #endif
-		printf("CSPOBASE mapped from 0x%llx to 0x%llx\n",CSP0BASE, CSP0BASE+MEM_SIZE);
+		printf("CSPOBASE mapped from 0x%llx to 0x%llx\n",
+				(long long unsigned int)CSP0BASE,
+				(long long unsigned int)(CSP0BASE+MEM_SIZE));
 		printf("Status Register: %08x\n",bus_r(STATUS_REG));
 
 	}else

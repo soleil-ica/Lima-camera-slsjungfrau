@@ -7,10 +7,10 @@
 #endif
 #include "firmware_funcs.h"
 #include "mcb_funcs.h"
-#include "trimming_funcs.h"
 #include "registers_g.h"
 #include "gitInfoGotthard.h"
 #include "AD9257.h"     // include "commonServerFunctions.h"
+#include "versionAPI.h"
 
 #define FIFO_DATA_REG_OFF     0x50<<11
 #define CONTROL_REG           0x24<<11
@@ -81,15 +81,16 @@ int init_detector( int b) {
 	printf("Initializing Detector\n");
 #endif
     testFpga();
-    testRAM();
 
     //gotthard specific
     setPhaseShiftOnce();
     configureADC();
-    setADC(-1); //already does setdaqreg and clean fifo
-    setSettings(GET_SETTINGS,-1);
 
-    //Initialization
+    setADC(-1); //already does setdaqreg and clean fifo
+    setSettings(DYNAMICGAIN,-1);
+    setDefaultDacs();
+
+	//Initialization
     setFrames(1);
     setTrains(1);
     setExposureTime(1e6);
@@ -99,7 +100,7 @@ int init_detector( int b) {
     setTiming(GET_EXTERNAL_COMMUNICATION_MODE);
     setMaster(GET_MASTER);
     setSynchronization(GET_SYNCHRONIZATION_MODE);
-    startReceiver(0);
+    startReceiver(1);
     setMasterSlaveConfiguration();
   }
   strcpy(mess,"dummy message");
@@ -195,6 +196,7 @@ int function_table() {
   flist[F_CLEANUP_ACQUISITION]=&stop_receiver;
   flist[F_CALIBRATE_PEDESTAL]=&calibrate_pedestal;
   flist[F_WRITE_ADC_REG]=&write_adc_register;
+  flist[F_CHECK_VERSION]= &check_version;
   return OK;
 }
 
@@ -591,6 +593,8 @@ int get_id(int file_des) {
   case DETECTOR_SOFTWARE_VERSION:
     retval = (GITDATE & 0xFFFFFF);
     break;
+	case CLIENT_SOFTWARE_API_VERSION:
+		return APIGOTTHARD;
   default:
     printf("Required unknown id %d \n", arg);
     ret=FAIL;
@@ -704,9 +708,9 @@ int digital_test(int file_des) {
   case DETECTOR_FIRMWARE_TEST:
     retval=testFpga();
     break;
-  case DETECTOR_MEMORY_TEST:
+  /*case DETECTOR_MEMORY_TEST:
     ret=testRAM();
-    break;
+    break;*/
   case DETECTOR_BUS_TEST:
     retval=testBus();
       break;
@@ -1660,19 +1664,43 @@ int set_settings(int file_des) {
     sprintf(mess,"Detector locked by %s\n",lastClientIP);  
   } else {
 #ifdef MCB_FUNCS
-    retval=setSettings(arg[0],imod);
-#endif
+		switch(isett) {
+			case GET_SETTINGS:
+			case UNINITIALIZED:
+			case DYNAMICGAIN:
+			case HIGHGAIN:
+			case LOWGAIN:
+			case MEDIUMGAIN:
+			case VERYHIGHGAIN:
+				break;
+			default:
+				ret = FAIL;
+				sprintf(mess,"Setting (%d) is not implemented for this detector.\n"
+						"Options are dynamicgain, highgain, lowgain, mediumgain and "
+						"veryhighgain.\n", isett);
+				cprintf(RED, "Warning: %s", mess);
+				break;
+		}
+		if (ret != FAIL) {
+			retval=setSettings(isett,imod);
 #ifdef VERBOSE
-    printf("Settings changed to %d\n",retval);
-#endif  
-    
-    if (retval==isett || isett<0) {
-      ret=OK;
-    } else {
-      ret=FAIL;
-      printf("Changing settings of module %d: wrote %d but read %d\n", imod, isett, retval);
-    }
-    
+			printf("Settings changed to %d\n",retval);
+#endif
+			if (retval != isett && isett >= 0) {
+				ret=FAIL;
+				sprintf(mess, "Changing settings of module %d: wrote %d but read %d\n", imod, isett, retval);
+				printf("Warning: %s",mess);
+			}
+
+			else {
+				ret = setDefaultDacs();
+				if (ret == FAIL) {
+					strcpy(mess,"Could change settings, but could not set to default dacs\n");
+					cprintf(RED, "Warning: %s", mess);
+				}
+			}
+		}
+#endif
   }
   if (ret==OK && differentClients==1)
     ret=FORCE_UPDATE;
@@ -1801,7 +1829,7 @@ int get_run_status(int file_des) {
 #endif 
 
   retval= runState();
-  printf("\n\nSTATUS=%08x\n",retval);
+  printf("STATUS=%08x\n",retval);
 
 
   //stopped (external stop, also maybe fifo full)
@@ -1889,93 +1917,44 @@ int get_run_status(int file_des) {
 }
 
 int read_frame(int file_des) {
+	dataret = FAIL;
+	strcpy(mess,"wait for read frame failed\n");
 
-  if (differentClients==1 && lockStatus==1) {
-    dataret=FAIL;
-    sprintf(mess,"Detector locked by %s\n",lastClientIP);  
-    sendDataOnly(file_des,&dataret,sizeof(dataret));
-    sendDataOnly(file_des,mess,sizeof(mess));
-#ifdef VERBOSE
-    printf("dataret %d\n",dataret);
-#endif
-    return dataret;
+	if (differentClients==1 && lockStatus==1) {
+		dataret=FAIL;
+		sprintf(mess,"Detector locked by %s\n",lastClientIP);
+		cprintf(RED,"%s\n",mess);
+		sendDataOnly(file_des,&dataret,sizeof(dataret));
+		sendDataOnly(file_des,mess,sizeof(mess));
+		return dataret;
+	}
 
-  }
- 
-  if (storeInRAM==0) {
-    if ((dataretval=(char*)fifo_read_event())) {
-      dataret=OK;
-#ifdef VERYVERBOSE
-      printf("Sending ptr %x %d\n",(unsigned int)(dataretval), dataBytes);
+
+#ifdef VIRTUAL
+	dataret = FINISHED;
+	strcpy(mess,"acquisition successfully finished\n");
+#else
+	waitForAcquisitionFinish();
+
+	// set return value and message
+	if(getFrames()>-2) {
+		dataret = FAIL;
+		sprintf(mess,"no data and run stopped: %d frames left\n",(int)(getFrames()+2));
+		cprintf(RED,"%s\n",mess);
+	} else {
+		dataret = FINISHED;
+		sprintf(mess,"acquisition successfully finished\n");
+		cprintf(GREEN,"%s",mess);
+
+	}
 #endif
-      sendDataOnly(file_des,&dataret,sizeof(dataret));
-      sendDataOnly(file_des,dataretval,dataBytes);
-#ifdef VERBOSE
-      printf("sent %d bytes \n",dataBytes);
-      printf("dataret OK\n");
-#endif
-      return OK;
-    }  else {
-      //might add delay????
-      if(getFrames()>-2) {
-	dataret=FAIL;
-	sprintf(mess,"no data and run stopped: %d frames left\n",(int)(getFrames()+2));
-	printf("%s\n",mess);
-      } else {
-	dataret=FINISHED;
-	sprintf(mess,"acquisition successfully finished\n");
-	printf("%s\n",mess);
-      }
-#ifdef VERYVERBOSE
-      printf("%d %d %x %s\n",(int)(sizeof(mess)),(int)(strlen(mess)),(unsigned int)( mess),mess);
-#endif
-      sendDataOnly(file_des,&dataret,sizeof(dataret));
-      sendDataOnly(file_des,mess,sizeof(mess));
-#ifdef VERYVERBOSE
-      printf("message sent %s\n",mess);
-#endif
-      printf("dataret %d\n",dataret);
-      return dataret;
-    }
-  } else {
-    nframes=0;
-    while(fifo_read_event()) {
-      nframes++;
-    }
-    dataretval=(char*)ram_values;
-    dataret=OK;
-#ifdef VERBOSE
-    printf("sending data of %d frames\n",nframes);
-#endif
-    for (iframes=0; iframes<nframes; iframes++) {
-      sendDataOnly(file_des,&dataret,sizeof(dataret));
-#ifdef VERYVERBOSE
-      printf("sending pointer %x of size %d\n",(unsigned int)(dataretval),dataBytes);
-#endif
-      sendDataOnly(file_des,dataretval,dataBytes);
-      dataretval+=dataBytes;
-    }
-    if (getFrames()>-2) {
-      dataret=FAIL;
-      sprintf(mess,"no data and run stopped: %d frames left\n",(int)(getFrames()+2));
-      printf("%s\n",mess);
-    } else {
-      dataret=FINISHED;
-      sprintf(mess,"acquisition successfully finished\n");
-      printf("%s\n",mess);
-      if (differentClients)
-	dataret=FORCE_UPDATE;
-    }
-#ifdef VERBOSE
-      printf("Frames left %d\n",(int)(getFrames()));
-#endif
-    sendDataOnly(file_des,&dataret,sizeof(dataret));
-    sendDataOnly(file_des,mess,sizeof(mess));
-    printf("dataret %d\n",dataret);
-    return dataret;
-  }
-  printf("dataret %d\n",dataret);
-  return dataret; 
+
+	if (differentClients)
+		dataret=FORCE_UPDATE;
+
+	sendDataOnly(file_des,&dataret,sizeof(dataret));
+	sendDataOnly(file_des,mess,sizeof(mess));
+	return dataret;
 }
 
 
@@ -2069,7 +2048,7 @@ int set_timer(int file_des) {
 
 #ifdef VERBOSE
   printf("setting timer %d to %lld ns\n",ind,tns);
-#endif 
+#endif
   if (ret==OK) {
 
     if (differentClients==1 && lockStatus==1 && tns!=-1) { 
@@ -2120,10 +2099,6 @@ int set_timer(int file_des) {
   if (ret!=OK) {
     printf(mess);
     printf("set timer failed\n");
-  } else if (ind==FRAME_NUMBER) {
-    ret=allocateRAM();
-    if (ret!=OK) 
-      sprintf(mess, "could not allocate RAM for %lld frames\n", tns);
   }
 
   n = sendDataOnly(file_des,&ret,sizeof(ret));
@@ -2264,12 +2239,6 @@ int set_dynamic_range(int file_des) {
   //if (dr>=0 && retval!=dr)   ret=FAIL;
   if (ret!=OK) {
     sprintf(mess,"set dynamic range failed\n");
-  } else {
-    ret=allocateRAM();
-    if (ret!=OK)
-      sprintf(mess,"Could not allocate RAM for the dynamic range selected\n");
-    else  if (differentClients)
-      ret=FORCE_UPDATE;
   }
 
   n = sendDataOnly(file_des,&ret,sizeof(ret));
@@ -2312,9 +2281,9 @@ int set_roi(int file_des) {
 			  ret=FAIL;
 		  }
 		  //#ifdef VERBOSE
-		  printf("Setting ROI to:");
+		  printf("\n\nSetting ROI: nroi=%d\n",nroi);
 		  for( i=0;i<nroi;i++)
-			  printf("%d\t%d\t%d\t%d\n",arg[i].xmin,arg[i].xmax,arg[i].ymin,arg[i].ymax);
+			  printf("\t%d\t%d\t%d\t%d\n",arg[i].xmin,arg[i].xmax,arg[i].ymin,arg[i].ymax);
 		  //#endif
 	  }
 	  /* execute action if the arguments correctly arrived*/
@@ -2624,7 +2593,7 @@ int configure_mac(int file_des) {
 	sscanf(arg[3], "%llx",	&idetectormacadd);
 	sscanf(arg[4], "%x",		&detipad);
 	//arg[5] is udpport2 for eiger
-#ifdef VERBOSE
+//#ifdef VERBOSE
 	int i;
 	printf("\ndigital_test_bit in server %d\t",digitalTestBit);
 	printf("\nipadd %x\t",ipad);
@@ -2637,8 +2606,9 @@ int configure_mac(int file_des) {
 	for (i=0;i<6;i++)
 		printf("detector mac adress %d is 0x%x \n",6-i,(unsigned int)(((idetectormacadd>>(8*i))&0xFF)));
 	printf("detipad %x\n",detipad);
+	printf("destination ip is %d.%d.%d.%d = 0x%x \n",(detipad>>24)&0xff,(detipad>>16)&0xff,(detipad>>8)&0xff,(detipad)&0xff,detipad);
 	printf("\n");
-#endif
+//#endif
 
 
 
@@ -3111,6 +3081,70 @@ int write_adc_register(int file_des) {
 		n = sendDataOnly(file_des,mess,sizeof(mess));
 	} else
 		n = sendDataOnly(file_des,&retval,sizeof(retval));
+
+	// return ok / fail
+	return ret;
+}
+
+
+
+
+int check_version(int file_des) {
+	int ret=OK,ret1=OK;
+	int n=0;
+	sprintf(mess,"check version failed\n");
+
+
+
+	// receive arguments
+	int64_t arg=-1;
+	n = receiveData(file_des,&arg,sizeof(arg),INT64);
+	if (n < 0) {
+		sprintf(mess,"Error reading from socket\n");
+		ret=FAIL;
+	}
+
+
+	// execute action
+	if (ret == OK) {
+#ifdef VERBOSE
+		printf("Checking versioning compatibility with value %d\n",arg);
+#endif
+		int64_t client_requiredVersion = arg;
+		int64_t det_apiVersion = APIGOTTHARD;
+		int64_t det_version = (GITDATE & 0xFFFFFF);
+
+		// old client
+		if (det_apiVersion > client_requiredVersion) {
+			ret = FAIL;
+			sprintf(mess,"Client's detector SW API version: (0x%llx). "
+					"Detector's SW API Version: (0x%llx). "
+					"Incompatible, update client!\n",
+					client_requiredVersion, det_apiVersion);
+			cprintf(RED, "Warning: %s", mess);
+		}
+
+		// old software
+		else if (client_requiredVersion > det_version) {
+			ret = FAIL;
+			sprintf(mess,"Detector SW Version: (0x%llx). "
+					"Client's detector SW API Version: (0x%llx). "
+					"Incompatible, update detector software!\n",
+					det_version, client_requiredVersion);
+			cprintf(RED, "Warning: %s", mess);
+		}
+	}
+
+
+
+	// ret could be swapped during sendData
+	ret1 = ret;
+	// send ok / fail
+	n = sendData(file_des,&ret1,sizeof(ret),INT32);
+	// send return argument
+	if (ret==FAIL) {
+		n += sendData(file_des,mess,sizeof(mess),OTHER);
+	}
 
 	// return ok / fail
 	return ret;

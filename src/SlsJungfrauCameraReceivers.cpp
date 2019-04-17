@@ -545,50 +545,45 @@ void CameraReceivers::finishedAcquisitionCallBack(uint64_t   in_frames_nb,
 
 /************************************************************************
  * \brief Get Receiver Data Call back
- * \param in_frame_number frame number
- * \param in_exp_length real time exposure length (in 100ns) or 
- *                      sub frame number (Eiger 32 bit mode only)
- * \param in_packet_number number of packets caught for this frame
- * \param in_bunch_id bunch id from beamline
- * \param in_timestamp time stamp in 10MHz clock (not implemented for most)
- * \param in_mod_id module id	(not implemented for most)
- * \param in_x_coord x coordinates (detector id in 1D)
- * \param in_y_coord y coordinates (not implemented)
- * \param in_z_coord z coordinates (not implemented)
- * \param in_debug debug values if any
- * \param in_round_r_number (not implemented)
- * \param in_det_type detector type see :: detectorType
- * \param in_version version of standard header (structure format)
+ * \param in_metadata sls_receiver_header metadata
  * \param in_data_pointer pointer to data
  * \param in_data_size data size in bytes
  * \param in_user_data pointer to user data object
  ************************************************************************/
-void CameraReceivers::acquisitionDataReadyCallBack(uint64_t   in_frame_number  ,
-                                                   uint32_t   in_exp_length    ,
-                                                   uint32_t   in_packet_number ,
-                                                   uint64_t   in_bunch_id      ,
-                                                   uint64_t   in_timestamp     ,
-                                                   uint16_t   in_mod_id        ,
-                                                   uint16_t   in_x_coord       ,
-                                                   uint16_t   in_y_coord       ,
-                                                   uint16_t   in_z_coord       ,
-                                                   uint32_t   in_debug         ,
-                                                   uint16_t   in_round_r_number,
-                                                   uint8_t    in_det_type      ,
-                                                   uint8_t    in_version       ,
-                                                   char     * in_data_pointer  ,
-                                                   uint32_t   in_data_size     ,
-                                                   void     * in_user_data     )
+void CameraReceivers::acquisitionDataReadyCallBack(char     * in_meta_data   ,
+                                                   char     * in_data_pointer,
+                                                   uint32_t   in_data_size   ,
+                                                   void     * in_user_data   )
 {
+    slsReceiverDefs::sls_receiver_header* header = (slsReceiverDefs::sls_receiver_header*)in_meta_data;
+	const slsReceiverDefs::sls_detector_header & detector_header = header->detHeader;
+
 #ifdef CAMERA_RECEIVERS_ACTIVATE_SDK_CALLBACK_TRACE
-    PRINT_IN_COLOR (in_mod_id?in_mod_id:in_x_coord,
-			"#### %d GetData: ####\n"
-			"frameNumber: %llu\t\texpLength: %u\t\tpacketNumber: %u\t\tbunchId: %llu\t\ttimestamp: %llu\t\tmodId: %u\t\t"
-			"xCoord: %u\t\tyCoord: %u\t\tzCoord: %u\t\tdebug: %u\t\troundRNumber: %u\t\tdetType: %u\t\t"
-			"version: %u\t\tfirstbytedata: 0x%x\t\tdatsize: %u\n\n",
-			in_x_coord, in_frame_number, in_exp_length, in_packet_number, in_bunch_id, in_timestamp, in_mod_id,
-			in_x_coord, in_y_coord, in_z_coord, in_debug, in_round_r_number, in_det_type, in_version,
-			((uint8_t)(*((uint8_t*)(in_data_pointer)))), in_data_size);
+	PRINT_IN_COLOR (detector_header.modId?detector_header.modId:detector_header.row,
+			        "#### %d GetData: ####\n"
+			        "frameNumber: %llu\t\texpLength: %u\t\tpacketNumber: %u\t\tbunchId: %llu"
+			        "\t\ttimestamp: %llu\t\tmodId: %u\t\t"
+			        "row: %u\t\tcolumn: %u\t\treserved: %u\t\tdebug: %u"
+			        "\t\troundRNumber: %u\t\tdetType: %u\t\tversion: %u"
+			        //"\t\tpacketsMask:%s"
+			        "\t\tfirstbytedata: 0x%x\t\tdatsize: %u\n\n",
+			        detector_header.row, 
+                    (long long unsigned int)detector_header.frameNumber,
+			        detector_header.expLength, 
+                    detector_header.packetNumber, 
+                    (long long unsigned int)detector_header.bunchId,
+			        (long long unsigned int)detector_header.timestamp,
+                    detector_header.modId,
+			        detector_header.row,
+                    detector_header.column,
+                    detector_header.reserved,
+			        detector_header.debug,
+                    detector_header.roundRNumber,
+			        detector_header.detType,
+                    detector_header.version,
+			        //header->packetsMask.to_string().c_str(),
+                    ((uint8_t)(*((uint8_t*)(in_data_pointer)))),
+                    in_data_size);
 #endif
 
     // we call the internal management of the callback using the user data
@@ -596,9 +591,9 @@ void CameraReceivers::acquisitionDataReadyCallBack(uint64_t   in_frame_number  ,
     // CameraReceivers instance smart pointer and to the receiver index.
     CameraReceiver * user_data = static_cast<CameraReceiver *>(in_user_data);
     user_data->getReceivers()->acquisitionDataReady(user_data->getReceiverIndex(),
-                                                    in_frame_number              ,
-                                                    in_packet_number             ,
-                                                    in_timestamp                 ,
+                                                    detector_header.frameNumber  ,
+                                                    detector_header.packetNumber ,
+                                                    detector_header.timestamp    ,
                                                     in_data_pointer              ,
                                                     in_data_size                 );
 }

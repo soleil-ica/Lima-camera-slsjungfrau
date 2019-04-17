@@ -1,5 +1,5 @@
 #ifndef POSTPROCESSINGFUNCS_H
-#define POSTPROCESSINGFUNC_H
+#define POSTPROCESSINGFUNCS_H
 
 
 
@@ -17,7 +17,7 @@
 #include "angularConversionStatic.h"
 class angleConversionConstant;
 
-using namespace std;
+
 
 
 class postProcessingFuncs : public virtual angularConversionStatic
@@ -77,4 +77,4 @@ class postProcessingFuncs : public virtual angularConversionStatic
 }; 
 
 
-#endif
+#endif //POSTPROCESSINGFUNCS_H

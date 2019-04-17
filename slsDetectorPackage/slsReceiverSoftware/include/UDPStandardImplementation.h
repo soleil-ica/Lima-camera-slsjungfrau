@@ -14,7 +14,6 @@ class DataProcessor;
 class DataStreamer;
 class Fifo;
 
-#include <vector>
 
 
 class UDPStandardImplementation: private virtual slsReceiverDefs, public UDPBaseImplementation {
@@ -35,6 +34,7 @@ class UDPStandardImplementation: private virtual slsReceiverDefs, public UDPBase
 
 
 	//*** Overloaded Functions called by TCP Interface ***
+
 	/**
 	 * Get Total Frames Caught for an entire acquisition (including all scans)
 	 * @return total number of frames caught for entire acquisition
@@ -54,6 +54,13 @@ class UDPStandardImplementation: private virtual slsReceiverDefs, public UDPBase
 	int64_t getAcquisitionIndex() const;
 
 	/**
+	 * Set Gap Pixels Enable (eiger specific)
+	 * @param b true for gap pixels enable, else false
+	 * @return OK or FAIL
+	 */
+	int setGapPixelsEnable(const bool b);
+
+	/**
 	 * Set File Format
 	 * @param f fileformat binary or hdf5
 	 */
@@ -66,11 +73,11 @@ class UDPStandardImplementation: private virtual slsReceiverDefs, public UDPBase
 	void setFileWriteEnable(const bool b);
 
 	/**
-	 * Set Short Frame Enabled, later will be moved to getROI (so far only for gotthard)
-	 * @param i index of adc enabled, else -1 if all enabled
+	 * Set ROI
+	 * @param i ROI
 	 * @return OK or FAIL
 	 */
-	int setShortFrameEnable(const int i);
+	int setROI(const std::vector<ROI> i);
 
 	/**
 	 * Set the Frequency of Frames Sent to GUI
@@ -85,6 +92,13 @@ class UDPStandardImplementation: private virtual slsReceiverDefs, public UDPBase
 	 * @return OK or FAIL
 	 */
 	int setDataStreamEnable(const bool enable);
+
+	/**
+	 * Set Number of Samples expected by receiver from detector
+	 * @param i number of Samples expected
+	 * @return OK or FAIL
+	 */
+	int setNumberofSamples(const uint64_t i);
 
 	/**
 	 * Set Dynamic Range or Number of Bits Per Pixel
@@ -107,11 +121,6 @@ class UDPStandardImplementation: private virtual slsReceiverDefs, public UDPBase
 	 */
 	int setFifoDepth(const uint32_t i);
 
-	/**
-	 * Set Silent Mode
-	 * @param i silent mode. 1 sets, 0 unsets
-	 */
-	void setSilentMode(const uint32_t i);
 
 	/**
 	 * Set receiver type (and corresponding detector variables in derived STANDARD class)
@@ -169,6 +178,13 @@ class UDPStandardImplementation: private virtual slsReceiverDefs, public UDPBase
 	 * Closes file / all files(data compression involves multiple files)
 	 */
 	void closeFiles();
+
+    /** (not saved in client shared memory)
+     * Set UDP Socket Buffer Size
+     * @param s UDP Socket Buffer Size
+     * @return OK or FAIL if dummy socket could be created
+     */
+    int setUDPSocketBufferSize(const uint32_t s);
 
 	/**
 	 * Restream stop dummy packet from receiver
@@ -242,6 +258,9 @@ private:
 
 	/** Number of Jobs */
 	int numberofJobs;
+
+	/** Number of channels in roi for jungfrauctb */
+	uint32_t nroichannels;
 
 	//** class objects ***
 	/** General Data Properties */

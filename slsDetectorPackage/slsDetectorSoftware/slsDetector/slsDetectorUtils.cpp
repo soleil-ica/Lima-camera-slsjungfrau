@@ -9,7 +9,9 @@
 #include  <sys/ipc.h>
 #include  <sys/shm.h>
 #include <time.h> //clock()
+#include <string>
 using namespace std;
+
 slsDetectorUtils::slsDetectorUtils()  {
 
 
@@ -54,6 +56,8 @@ int  slsDetectorUtils::acquire(int delflag){
 
 	//in the real time acquisition loop, processing thread will wait for a post each time
 	sem_init(&sem_newRTAcquisition,1,0);
+	//in the real time acquistion loop, main thread will wait for processing thread to be done each time (which in turn waits for receiver/ext process)
+	sem_init(&sem_endRTAcquisition,1,0);
 
 
 	bool receiver = (setReceiverOnline()==ONLINE_FLAG);
@@ -230,8 +234,6 @@ int  slsDetectorUtils::acquire(int delflag){
 
 						setCurrentFrameIndex(0);
 
-						if(receiver)
-							pthread_mutex_lock(&mg);
 						if (multiframe>1)
 							setFrameIndex(0);
 						else
@@ -239,7 +241,6 @@ int  slsDetectorUtils::acquire(int delflag){
 
 						// file name and start receiver
 						if(receiver){
-							pthread_mutex_unlock(&mg);
 							pthread_mutex_lock(&mp);
 							createFileName();
 							pthread_mutex_unlock(&mp);
@@ -311,9 +312,14 @@ int  slsDetectorUtils::acquire(int delflag){
 					// stop receiver
 					else{
 						pthread_mutex_lock(&mg);
-						if (stopReceiver() == FAIL)
+						if (stopReceiver() == FAIL) {
 							*stoppedFlag = 1;
-						pthread_mutex_unlock(&mg);
+							pthread_mutex_unlock(&mg);
+						} else {
+							pthread_mutex_unlock(&mg);
+							  if (*threadedProcessing && dataReady)
+								  sem_wait(&sem_endRTAcquisition); // waits for receiver's external process to be done sending data to gui
+						  }
 					}
 
 					// header after
@@ -445,16 +451,18 @@ int  slsDetectorUtils::acquire(int delflag){
 	cout << "acquisition finished callback done " << endl;
 #endif
 
-	sem_destroy(&sem_newRTAcquisition);
+  sem_destroy(&sem_newRTAcquisition);
+  sem_destroy(&sem_endRTAcquisition);
 
 #ifdef VERBOSE
 	clock_gettime(CLOCK_REALTIME, &end);
 	cout << "Elapsed time for acquisition:" << (( end.tv_sec - begin.tv_sec )	+ ( end.tv_nsec - begin.tv_nsec ) / 1000000000.0) << " seconds" << endl;
 #endif
 
-	setAcquiringFlag(false);
+  setAcquiringFlag(false);
 
-	return OK;
+  return OK;
+
 
 }
 

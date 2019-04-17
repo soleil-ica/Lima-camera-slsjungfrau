@@ -1,10 +1,10 @@
-# LaTeX2HTML 2008 (1.71)
+# LaTeX2HTML 2012 (1.2)
 # Associate images original text with physical files.
 
 
 $key = q/tau;MSF=1.6;AAT/;
 $cached_env_img{$key} = q|<IMG
- WIDTH="13" HEIGHT="13" ALIGN="BOTTOM" BORDER="0"
+ WIDTH="13" HEIGHT="14" ALIGN="BOTTOM" BORDER="0"
  SRC="|."$dir".q|img1.png"
  ALT="$\tau$">|; 
 

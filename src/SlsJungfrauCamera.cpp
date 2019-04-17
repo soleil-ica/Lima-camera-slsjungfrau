@@ -142,7 +142,12 @@ void Camera::init(const std::string & in_config_file_name)
     // creating the detector control instance
     int id = 0;
 
-    m_detector_control = new slsDetectorUsers(id);
+    m_detector_control = new slsDetectorUsers(result, id);
+
+    if(result == slsDetectorDefs::FAIL)
+    {
+        THROW_HW_FATAL(ErrorType::Error) << "slsDetectorUsers constructor failed! Could not initialize the camera!";
+    }
 
     // configuration file is used to properly configure advanced settings in the shared memory
     result = m_detector_control->readConfigurationFile(m_config_file_name);
@@ -184,13 +189,7 @@ void Camera::init(const std::string & in_config_file_name)
     m_detector_control->enableWriteToFile(slsDetectorDefs::DISABLED);
 
     // setting the receiver fifo depth (number of frames in the receiver memory)
-    // in a next sdk release, we could have a method to call.
-    // At the moment, we should use the put command.
-    {
-        std::stringstream tempStream;
-        tempStream << "rx_fifodepth " << m_receiver_fifo_depth;
-        setCmd(tempStream.str());
-    }
+    m_detector_control->setReceiverFifoDepth(m_receiver_fifo_depth);
 
     // initing the internal copies of exposure & latency times
     updateTimes();
@@ -221,9 +220,7 @@ void Camera::cleanSharedMemory()
 {
     DEB_MEMBER_FUNCT();
 
-    std::string cmd = "ipcs -m | grep -E '^0x000016[0-9a-z]{2}' | "
-                      "awk '{print $2}' | while read m; do ipcrm -m $m; done";
-
+    std::string cmd = "rm /dev/shm/slsDetectorPackage*;";
     std::system(cmd.c_str());
 }
 
@@ -257,12 +254,8 @@ void Camera::prepareAcq()
             THROW_HW_ERROR(ErrorType::Error) << "Start mode is not allowed for this device! Please use Snap mode.";
     }
 
-
     // reset the number of caught frames in the sdk
-    // in the next sdk release, we will use the method int resetFramesCaughtInReceiver().
-    // At the moment, we should use the put command.
-    // the given value 0 is just because put requires an argument, so it can be anything.
-    setCmd("resetframescaught 0");
+    m_detector_control->resetFramesCaughtInReceiver();
 
     // clear the frames containers
     m_frames_manager.clear();
@@ -1283,9 +1276,10 @@ void Camera::releaseArgs(char * * & in_out_argv  ,
 /*******************************************************************
  * \brief Executes a set command
  * \param in_command command in command line format
+ * \param in_module_index module index
  * \return the command result
  *******************************************************************/
-std::string Camera::setCmd(const std::string & in_command)
+std::string Camera::setCmd(const std::string & in_command, int in_module_index)
 {
 	DEB_MEMBER_FUNCT();
     DEB_PARAM() << "Camera::setCmd - execute set command:\"" << in_command << "\"";
@@ -1301,7 +1295,7 @@ std::string Camera::setCmd(const std::string & in_command)
         // protecting the sdk concurrent access
         lima::AutoMutex sdk_mutex = sdkLock(); 
 
-        result = m_detector_control->putCommand(argc, argv);
+        result = m_detector_control->putCommand(argc, argv, in_module_index);
     }
 
     releaseArgs(argv, argc);
@@ -1313,9 +1307,10 @@ std::string Camera::setCmd(const std::string & in_command)
 /*******************************************************************
  * \brief Executes a get command
  * \param in_command command in command line format
+ * \param in_module_index module index
  * \return the command result
  *******************************************************************/
-std::string Camera::getCmd(const std::string & in_command)
+std::string Camera::getCmd(const std::string & in_command, int in_module_index)
 {
 	DEB_MEMBER_FUNCT();
     DEB_PARAM() << "Camera::getCmd - execute get command:\"" << in_command << "\"";
@@ -1331,7 +1326,7 @@ std::string Camera::getCmd(const std::string & in_command)
         // protecting the sdk concurrent access
         lima::AutoMutex sdk_mutex = sdkLock(); 
 
-        result = m_detector_control->getCommand(argc, argv);
+        result = m_detector_control->getCommand(argc, argv, in_module_index);
     }
 
     releaseArgs(argv, argc);

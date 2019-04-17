@@ -7,8 +7,9 @@
 #include "slow_adc.h"
 #include "registers_m.h"
 #include "gitInfoMoench.h"
+#include "blackfin.h"
 
-#define FIFO_DATA_REG_OFF     0x50<<11
+#define FIFO_DATA_REG_OFF     0x50 << MEM_MAP_SHIFT
 // Global variables
 
 
@@ -154,16 +155,97 @@ int decode_function(int file_des) {
   else
     printf("size of data received %d\n",n);
 #endif
-
+  printf("calling function=%d (%s)\n", fnum, getFunctionName((enum detFuncs)fnum));
 #ifdef VERBOSE
   printf( "calling function fnum = %d %x %x %x\n",fnum,(unsigned int)(flist[fnum]), (unsigned int)(flist[F_READ_REGISTER]),(unsigned int)(&read_register));
 #endif
   if (fnum<0 || fnum>255)
     fnum=255;
   retval=(*flist[fnum])(file_des);
+  printf(" function=%d (%s) returned: %d\n", fnum, getFunctionName((enum detFuncs)fnum), retval);
   if (retval==FAIL)
     printf( "Error executing the function = %d \n",fnum);
   return retval;
+}
+
+
+const char* getFunctionName(enum detFuncs func) {
+	switch (func) {
+	case F_EXEC_COMMAND:					return "F_EXEC_COMMAND";
+	case F_GET_ERROR:						return "F_GET_ERROR";
+	case F_GET_DETECTOR_TYPE:				return "F_GET_DETECTOR_TYPE";
+	case F_SET_NUMBER_OF_MODULES:			return "F_SET_NUMBER_OF_MODULES";
+	case F_GET_MAX_NUMBER_OF_MODULES:		return "F_GET_MAX_NUMBER_OF_MODULES";
+	case F_SET_EXTERNAL_SIGNAL_FLAG:		return "F_SET_EXTERNAL_SIGNAL_FLAG";
+	case F_SET_EXTERNAL_COMMUNICATION_MODE:	return "F_SET_EXTERNAL_COMMUNICATION_MODE";
+	case F_GET_ID:							return "F_GET_ID";
+	case F_DIGITAL_TEST:					return "F_DIGITAL_TEST";
+	case F_ANALOG_TEST:						return "F_ANALOG_TEST";
+	case F_ENABLE_ANALOG_OUT:				return "F_ENABLE_ANALOG_OUT";
+	case F_CALIBRATION_PULSE:				return "F_CALIBRATION_PULSE";
+	case F_SET_DAC:							return "F_SET_DAC";
+	case F_GET_ADC:							return "F_GET_ADC";
+	case F_WRITE_REGISTER:					return "F_WRITE_REGISTER";
+	case F_READ_REGISTER:					return "F_READ_REGISTER";
+	case F_WRITE_MEMORY:					return "F_WRITE_MEMORY";
+	case F_READ_MEMORY:						return "F_READ_MEMORY";
+	case F_SET_CHANNEL:						return "F_SET_CHANNEL";
+	case F_GET_CHANNEL:						return "F_GET_CHANNEL";
+	case F_SET_ALL_CHANNELS:				return "F_SET_ALL_CHANNELS";
+	case F_SET_CHIP:						return "F_SET_CHIP";
+	case F_GET_CHIP:						return "F_GET_CHIP";
+	case F_SET_ALL_CHIPS:					return "F_SET_ALL_CHIPS";
+	case F_SET_MODULE:						return "F_SET_MODULE";
+	case F_GET_MODULE:						return "F_GET_MODULE";
+	case F_SET_ALL_MODULES:					return "F_SET_ALL_MODULES";
+	case F_SET_SETTINGS:					return "F_SET_SETTINGS";
+	case F_GET_THRESHOLD_ENERGY:			return "F_GET_THRESHOLD_ENERGY";
+	case F_SET_THRESHOLD_ENERGY:			return "F_SET_THRESHOLD_ENERGY";
+	case F_START_ACQUISITION:				return "F_START_ACQUISITION";
+	case F_STOP_ACQUISITION:				return "F_STOP_ACQUISITION";
+	case F_START_READOUT:					return "F_START_READOUT";
+	case F_GET_RUN_STATUS:					return "F_GET_RUN_STATUS";
+	case F_START_AND_READ_ALL:				return "F_START_AND_READ_ALL";
+	case F_READ_FRAME:						return "F_READ_FRAME";
+	case F_READ_ALL:						return "F_READ_ALL";
+	case F_SET_TIMER:						return "F_SET_TIMER";
+	case F_GET_TIME_LEFT:					return "F_GET_TIME_LEFT";
+	case F_SET_DYNAMIC_RANGE:				return "F_SET_DYNAMIC_RANGE";
+	case F_SET_READOUT_FLAGS:				return "F_SET_READOUT_FLAGS";
+	case F_SET_ROI:							return "F_SET_ROI";
+	case F_SET_SPEED:						return "F_SET_SPEED";
+	case F_EXECUTE_TRIMMING:				return "F_EXECUTE_TRIMMING";
+	case F_EXIT_SERVER:						return "F_EXIT_SERVER";
+	case F_LOCK_SERVER:						return "F_LOCK_SERVER";
+	case F_GET_LAST_CLIENT_IP:				return "F_GET_LAST_CLIENT_IP";
+	case F_SET_PORT:						return "F_SET_PORT";
+	case F_UPDATE_CLIENT:					return "F_UPDATE_CLIENT";
+	case F_CONFIGURE_MAC:					return "F_CONFIGURE_MAC";
+	case F_LOAD_IMAGE:						return "F_LOAD_IMAGE";
+	case F_SET_MASTER:						return "F_SET_MASTER";
+	case F_SET_SYNCHRONIZATION_MODE:		return "F_SET_SYNCHRONIZATION_MODE";
+	case F_READ_COUNTER_BLOCK:				return "F_READ_COUNTER_BLOCK";
+	case F_RESET_COUNTER_BLOCK:				return "F_RESET_COUNTER_BLOCK";
+	case F_CALIBRATE_PEDESTAL:				return "F_CALIBRATE_PEDESTAL";
+	case F_ENABLE_TEN_GIGA:					return "F_ENABLE_TEN_GIGA";
+	case F_SET_ALL_TRIMBITS:				return "F_SET_ALL_TRIMBITS";
+	case F_SET_CTB_PATTERN:					return "F_SET_CTB_PATTERN";
+	case F_WRITE_ADC_REG:					return "F_WRITE_ADC_REG";
+	case F_SET_COUNTER_BIT:					return "F_SET_COUNTER_BIT";
+	case F_PULSE_PIXEL:						return "F_PULSE_PIXEL";
+	case F_PULSE_PIXEL_AND_MOVE:			return "F_PULSE_PIXEL_AND_MOVE";
+	case F_PULSE_CHIP:						return "F_PULSE_CHIP";
+	case F_SET_RATE_CORRECT:				return "F_SET_RATE_CORRECT";
+	case F_GET_RATE_CORRECT:				return "F_GET_RATE_CORRECT";
+	case F_SET_NETWORK_PARAMETER:			return "F_SET_NETWORK_PARAMETER";
+	case F_PROGRAM_FPGA:					return "F_PROGRAM_FPGA";
+	case F_RESET_FPGA:						return "F_RESET_FPGA";
+	case F_POWER_CHIP:						return "F_POWER_CHIP";
+	case F_ACTIVATE:						return "F_ACTIVATE";
+	case F_PREPARE_ACQUISITION:				return "F_PREPARE_ACQUISITION";
+	case F_CLEANUP_ACQUISITION:				return "F_CLEANUP_ACQUISITION";
+	default:								return "Unknown Function";
+	}
 }
 
 
@@ -218,14 +300,15 @@ int function_table() {
   flist[F_SET_SYNCHRONIZATION_MODE]=&set_synchronization;
   flist[F_READ_COUNTER_BLOCK]=&read_counter_block;
   flist[F_RESET_COUNTER_BLOCK]=&reset_counter_block;
-  flist[F_START_RECEIVER]=&start_receiver;
-  flist[F_STOP_RECEIVER]=&stop_receiver;
   flist[F_CALIBRATE_PEDESTAL]=&calibrate_pedestal;
   flist[F_SET_CTB_PATTERN]=&set_ctb_pattern;
   flist[F_WRITE_ADC_REG]=&write_adc_register;
   flist[F_PROGRAM_FPGA]=&program_fpga;
   flist[F_POWER_CHIP]=&power_chip;
   flist[F_RESET_FPGA]=&reset_fpga;
+  flist[F_ACTIVATE]=&activate;
+  flist[F_PREPARE_ACQUISITION]=&prepare_acquisition;
+  flist[F_CLEANUP_ACQUISITION]=&cleanup_acquisition;
   return OK;
 }
 
@@ -238,7 +321,7 @@ int  M_nofunc(int file_des){
 
   sendDataOnly(file_des,&ret,sizeof(ret));
   sendDataOnly(file_des,mess,sizeof(mess));
-  return GOODBYE;
+  return FAIL;
 }
 
 
@@ -784,7 +867,7 @@ int write_register(int file_des) {
 
 
   if(ret!=FAIL){
-    address=(addr<<11);
+    address=(addr << MEM_MAP_SHIFT);
     if((address==FIFO_DATA_REG_OFF)||(address==CONTROL_REG))
     	ret = bus_w16(address,val);
     else
@@ -850,7 +933,7 @@ int read_register(int file_des) {
   //#endif
 
   if(ret!=FAIL){
-	  address=(addr<<11);
+	  address=(addr << MEM_MAP_SHIFT);
 	  if((address==FIFO_DATA_REG_OFF)||(address==CONTROL_REG))
 		  retval=bus_r16(address);
 	  else
@@ -957,7 +1040,7 @@ int set_dac(int file_des) {
 		    }
 		    
 		    if (vLimitCompliant(v))
-		      retval=setDac(ind,val);
+		      retval=setDac(ind,val); // in DACu
 
 
 		  } else {
@@ -2068,7 +2151,7 @@ int set_timer(int file_des) {
     ret=FAIL;
   }
   
-  n = receiveDataOnly(file_des,&tns,sizeof(tns));
+  n = receiveDataOnly(file_des,&tns,sizeof(tns)); // total received data
   if (n < 0) {
     sprintf(mess,"Error reading from socket\n");
     ret=FAIL;
@@ -3072,80 +3155,6 @@ int reset_counter_block(int file_des) {
 
 
 
-
-
-
-
-int start_receiver(int file_des) {
-	int ret=OK;
-	int n=0;
-	strcpy(mess,"Could not start receiver\n");
-
-	/* execute action if the arguments correctly arrived*/
-	//#ifdef MCB_FUNCS
-	if (lockStatus==1 && differentClients==1){//necessary???
-		sprintf(mess,"Detector locked by %s\n", lastClientIP);
-		ret=FAIL;
-	}
-	else
-		ret = startReceiver(1);
-
-	//#endif
-
-
-	if(ret==OK && differentClients){
-		printf("Force update\n");
-		ret=FORCE_UPDATE;
-	}
-
-	/* send answer */
-	n = sendDataOnly(file_des,&ret,sizeof(ret));
-	if(ret==FAIL)
-		n = sendDataOnly(file_des,mess,sizeof(mess));
-	/*return ok/fail*/
-	return ret;
-}
-
-
-
-
-
-
-int stop_receiver(int file_des) {
-	int ret=OK;
-	int n=0;
-
-	strcpy(mess,"Could not stop receiver\n");
-
-	/* execute action if the arguments correctly arrived*/
-	//#ifdef MCB_FUNCS
-	if (lockStatus==1 && differentClients==1){//necessary???
-		sprintf(mess,"Detector locked by %s\n", lastClientIP);
-		ret=FAIL;
-	}
-	else
-		ret=startReceiver(0);
-
-	//#endif
-
-
-	if(ret==OK && differentClients){
-		printf("Force update\n");
-		ret=FORCE_UPDATE;
-	}
-
-	/* send answer */
-	n = sendDataOnly(file_des,&ret,sizeof(ret));
-	if(ret==FAIL)
-		n = sendDataOnly(file_des,mess,sizeof(mess));
-	/*return ok/fail*/
-	return ret;
-}
-
-
-
-
-
 int calibrate_pedestal(int file_des){
 
 	int ret=OK;
@@ -3209,6 +3218,7 @@ int set_ctb_pattern(int file_des){
 	  n = receiveDataOnly(file_des,&word,sizeof(word)); 
 	  ret=OK;
 
+	  printf("pattern addr is %d %x\n",addr, word);
 	  switch (addr) {
 	  case -1:
 	    retval64=writePatternIOControl(word);
@@ -3233,6 +3243,7 @@ int set_ctb_pattern(int file_des){
 	  break;
 
 	case 1: //pattern loop
+	  // printf("loop\n");
 	  n = receiveDataOnly(file_des,&level,sizeof(level)); 
 	  n = receiveDataOnly(file_des,&start,sizeof(start)); 
 	  n = receiveDataOnly(file_des,&stop,sizeof(stop)); 
@@ -3240,7 +3251,7 @@ int set_ctb_pattern(int file_des){
 	  
 
 
-	  printf("level %d start %x stop %x nl %d\n",level, start, stop, nl);
+	  //       printf("level %d start %x stop %x nl %d\n",level, start, stop, nl);
   /** Sets the pattern or loop limits in the CTB
       @param level -1 complete pattern, 0,1,2, loop level
       @param start start address if >=0
@@ -3263,6 +3274,7 @@ int set_ctb_pattern(int file_des){
 
 
 	case 2: //wait address
+	  printf("wait\n");
 	  n = receiveDataOnly(file_des,&level,sizeof(level)); 
 	  n = receiveDataOnly(file_des,&addr,sizeof(addr)); 
 
@@ -3290,6 +3302,7 @@ int set_ctb_pattern(int file_des){
 
 
 	case 3: //wait time
+	  printf("wait time\n");
 	  n = receiveDataOnly(file_des,&level,sizeof(level)); 
 	  n = receiveDataOnly(file_des,&t,sizeof(t)); 
 
@@ -3615,3 +3628,98 @@ int program_fpga(int file_des) {
 }
 
 
+int activate(int file_des) {
+
+	int retval=-1;
+	int ret=OK;
+	int arg=-1;
+	int n;
+	
+	sprintf(mess,"Can't activate detector\n");
+	n = receiveDataOnly(file_des,&arg,sizeof(arg));
+	if (n < 0) {
+		sprintf(mess,"Error reading from socket\n");
+		ret=FAIL;
+	}
+
+	if (ret==OK && differentClients==1)
+		ret=FORCE_UPDATE;
+	retval=arg;
+	/* send answer */
+	n = sendDataOnly(file_des,&ret,sizeof(ret));
+	if (ret==FAIL) {
+		n += sendDataOnly(file_des,mess,sizeof(mess));
+	} else
+		n += sendDataOnly(file_des,&retval,sizeof(retval));
+
+	return ret;
+}
+
+int prepare_acquisition(int file_des) {
+	int ret = OK;
+	int n=0;
+	strcpy(mess,"prepare acquisition failed\n");
+
+
+	ret = FAIL;
+	strcpy(mess,"Not implemented for this detector\n");
+	cprintf(RED, "Warning: %s", mess);
+	/*
+	//lock
+	if (ret==OK && differentClients && lockStatus) {
+		ret=FAIL;
+		sprintf(mess,"Detector locked by %s\n",lastClientIP);
+		cprintf(RED, "Warning: %s", mess);
+	}
+	else {
+		ret = startReceiver(1);
+		if (ret == FAIL)
+			cprintf(RED, "Warning: %s", mess);
+	}
+*/
+	
+	if(ret==OK && differentClients)
+		ret=FORCE_UPDATE;
+
+	/* send answer */
+	n = sendDataOnly(file_des,&ret,sizeof(ret));
+	if (ret==FAIL) {
+		n += sendDataOnly(file_des,mess,sizeof(mess));
+	} 
+	return ret;
+}
+
+int cleanup_acquisition(int file_des) {
+	int ret = OK;
+	int n=0;
+
+
+	//to receive any arguments
+	while (n > 0)
+		n = receiveDataOnly(file_des,mess,MAX_STR_LENGTH);
+
+	ret = FAIL;
+	strcpy(mess,"Not implemented for this detector\n");
+	cprintf(RED, "Warning: %s", mess);
+	/*
+	if (lockStatus && differentClients){//necessary???
+		sprintf(mess,"Detector locked by %s\n", lastClientIP);
+		cprintf(RED, "Warning: %s", mess);
+		ret=FAIL;
+	}
+	else {
+		ret=startReceiver(0);
+		if (ret == FAIL)
+			cprintf(RED, "Warning: %s", mess);
+	}
+	*/
+	if(ret==OK && differentClients)
+		ret=FORCE_UPDATE;
+
+	/* send answer */
+	n = sendDataOnly(file_des,&ret,sizeof(ret));
+	if (ret==FAIL) {
+		n += sendDataOnly(file_des,mess,sizeof(mess));
+	} 
+	return ret;
+}

@@ -11,13 +11,13 @@
  * @short Base class with all the functions for the UDP inteface of the receiver
  */
 
-#include <exception>
-
 #include "sls_receiver_defs.h"
 #include "receiver_defs.h"
 #include "utilities.h"
 #include "logger.h"
 
+#include <exception>
+#include <vector>
 
 class UDPInterface {
 
@@ -39,17 +39,23 @@ class UDPInterface {
 	 *	-setFileFormat
 	 *	-setFileWriteEnable
 	 *	-setOverwriteEnable
-	 *	-setFrameIndexEnable
 	 *	-setAcquisitionPeriod
 	 *	-setNumberOfFrames
 	 *	-setAcquisitionTime
-	 *	-setSubExpTime
+	 *	-setSubExpTime (if eiger)
+	 *	-setNumberofSamples (if chip test board)
 	 *	-setDynamicRange
-	 *	-setFlippedData
-	 *	-setActivate
-	 *	-setTenGigaEnable
+	 *	-setFlippedData (if eiger)
+	 *	-setActivate (if eiger)
+	 *	-setDeactivatedPadding (if eiger)
+	 *	-setTenGigaEnable (if eiger)
+	 *	-setGapPixelsEnable
 	 *	-setStreamingPort
+	 *	-setStreamingSourceIP
+	 *	-setAdditionalJsonHeader
 	 *	-setDataStreamEnable
+	 *	-setROI
+	 *
 	 *
 	 *
 	 *  supported sequence of method-calls:
@@ -110,7 +116,7 @@ class UDPInterface {
 	 * @param [in] receiver_type type can be standard or custom (must be derived from base class)
 	 * @return a UDPInterface reference to object depending on receiver type
 	 */
-	static UDPInterface *create(string receiver_type = "standard");
+	static UDPInterface *create(std::string receiver_type = "standard");
 
 	/**
 	 * Destructor
@@ -150,6 +156,12 @@ class UDPInterface {
 	 */
 	virtual int getFlippedData(int axis=0) const = 0;
 
+	/**
+	 * Get Gap Pixels Enable (eiger specific)
+	 * @return true if gap pixels enabled, else false
+	 */
+	virtual bool getGapPixelsEnable() const = 0;
+
 
 	//***file parameters***
 	/**
@@ -172,21 +184,33 @@ class UDPInterface {
 
 	/**
 	 * Get File Index
-	 * @return NULL or file index of acquisition
+	 * @return file index of acquisition
 	 */
 	virtual uint64_t getFileIndex() const = 0;
+
+	/**
+	 * Get Frames per File (0 means infinite)
+	 * @return Frames per File
+	 */
+	virtual uint32_t getFramesPerFile() const = 0;
+
+	/**
+	 * Get Frame Discard Policy
+	 * @return Frame Discard Policy
+	 */
+	virtual slsReceiverDefs::frameDiscardPolicy getFrameDiscardPolicy() const = 0;
+
+	/**
+	 * Get Partial Frame Padding Enable
+	 * @return Partial Frame Padding Enable
+	 */
+	virtual bool getFramePaddingEnable() const = 0;
 
 	/**
 	 * Get Scan Tag
 	 * @return scan tag //FIXME: needed? (unsigned integer?)
 	 */
 	virtual int getScanTag() const = 0;
-
-	/**
-	 * Get if Frame Index is enabled (acquisition of more than 1 frame adds '_f000000000000' to file name )
-	 * @return true if frame index needed, else false
-	 */
-	virtual bool getFrameIndexEnable() const = 0;
 
 	/**
 	 * Get File Write Enable
@@ -249,10 +273,10 @@ class UDPInterface {
 
 	//***acquisition parameters***
 	/**
-	 * Get Short Frame Enabled, later will be moved to getROI (so far only for gotthard)
+	 * Get ROI
 	 * @return index of adc enabled, else -1 if all enabled
 	 */
-	virtual int getShortFrameEnable() const = 0;
+	virtual std::vector<slsReceiverDefs::ROI> getROI() const = 0;
 
 	/**
 	 * Get the Frequency of Frames Sent to GUI
@@ -291,12 +315,24 @@ class UDPInterface {
 	 */
 	virtual uint64_t getSubExpTime() const = 0;
 
+	/**
+	 * Get Sub Period
+	 * @return Sub Period
+	 */
+	virtual uint64_t getSubPeriod() const = 0;
+
 	/*
 	 * Get Number of Frames expected by receiver from detector
-	 * The data receiver status will change from running to idle when it gets this number of frames FIXME: (Not implemented)
-	 * @return number of frames expected
+	 * The data receiver status will change from running to idle when it gets this number of frames FIXME: (for Leo? Not implemented)
+	 * @return number of samples expected
 	 */
 	virtual uint64_t getNumberOfFrames() const = 0;
+
+	/*
+	 * Get Number of Samples expected by receiver from detector (for chip test board only)
+	 * @return number of samples expected
+	 */
+	virtual uint64_t getNumberofSamples() const = 0;
 
 	/**
 	 * Get Dynamic Range or Number of Bits Per Pixel
@@ -323,19 +359,27 @@ class UDPInterface {
 	 */
 	virtual slsReceiverDefs::runStatus getStatus() const = 0;
 
-	/**
+	/** (not saved in client shared memory)
 	 * Get Silent Mode
 	 * @return silent mode
 	 */
-	virtual uint32_t getSilentMode() const = 0;
+	virtual bool getSilentMode() const = 0;
 
 	/**
 	 * Get activate
-	 * If deactivated, receiver will write dummy packets 0xFF
+	 * If deactivated, receiver will create dummy data if deactivated padding is enabled
 	 * (as it will receive nothing from detector)
-	 * @return 0 for deactivated, 1 for activated
+	 * @return false for deactivated, true for activated
 	 */
-	virtual int getActivate() const = 0;
+	virtual bool getActivate() const = 0;
+
+	/**
+	 * Get deactivated padding enable
+	 * If enabled, receiver will create dummy packets (0xFF), else it will create nothing
+	 * (as it will receive nothing from detector)
+	 * @return false for disabled, true for enabled
+	 */
+	virtual bool getDeactivatedPadding() const = 0;
 
 	/**
 	 * Get Streaming Port
@@ -343,6 +387,30 @@ class UDPInterface {
 	 */
 	virtual uint32_t getStreamingPort() const = 0;
 
+	/**
+	 * Get streaming source ip
+	 * @return streaming source ip
+	 */
+	virtual char *getStreamingSourceIP() const = 0;
+
+    /**
+     * Get additional json header
+     * @return additional json header
+     */
+    virtual char *getAdditionalJsonHeader() const = 0;
+
+
+    /** (not saved in client shared memory)
+     * Get UDP Socket Buffer Size
+     * @return UDP Socket Buffer Size
+     */
+    virtual uint32_t getUDPSocketBufferSize() const = 0;
+
+    /** (not saved in client shared memory)
+     * Get actual UDP Socket Buffer Size
+     * @return actual UDP Socket Buffer Size
+     */
+    virtual uint32_t getActualUDPSocketBufferSize() const = 0;
 
 	/*************************************************************************
 	 * Setters ***************************************************************
@@ -354,7 +422,7 @@ class UDPInterface {
 	 * Configure command line parameters
 	 * @param config_map mapping of config parameters passed from command line arguments
 	 */
-	virtual void configure(map<string, string> config_map) = 0;
+	virtual void configure(std::map<std::string, std::string> config_map) = 0;
 
 	/*
 	 * Set multi detector size
@@ -367,6 +435,14 @@ class UDPInterface {
 	 * @return if data is flipped across 'axis'
 	 */
 	virtual void setFlippedData(int axis=0, int enable=-1) = 0;
+
+
+	/**
+	 * Set Gap Pixels Enable (eiger specific)
+	 * @param b true for gap pixels enable, else false
+	 * @return OK or FAIL
+	 */
+	virtual int setGapPixelsEnable(const bool b) = 0;
 
 
 	//***file parameters***
@@ -397,16 +473,28 @@ class UDPInterface {
 	virtual void setFileIndex(const uint64_t i) = 0;
 
 	/**
+	 * Set Frames per File (0 means infinite)
+	 * @param i Frames per File
+	 */
+	virtual void setFramesPerFile(const uint32_t i) = 0;
+
+	/**
+	 * Set Frame Discard Policy
+	 * @param i Frame Discard Policy
+	 */
+	virtual void setFrameDiscardPolicy(const slsReceiverDefs::frameDiscardPolicy i) = 0;
+
+	/**
+	 * Set Partial Frame Padding Enable
+	 * @param i Partial Frame Padding Enable
+	 */
+	virtual void setFramePaddingEnable(const bool i) = 0;
+
+	/**
 	 * Set Scan Tag
 	 * @param i scan tag //FIXME: needed? (unsigned integer?)
 	 */
 	virtual void setScanTag(const int i) = 0;
-
-	/**
-	 * Set Frame Index Enable (acquisition of more than 1 frame adds '_f000000000000' to file name )
-	 * @param b true for frame index enable, else false
-	 */
-	virtual void setFrameIndexEnable(const bool b) = 0;
 
 	/**
 	 * Set File Write Enable
@@ -449,11 +537,11 @@ class UDPInterface {
 
 	//***acquisition parameters***
 	/**
-	 * Set Short Frame Enabled, later will be moved to getROI (so far only for gotthard)
-	 * @param i index of adc enabled, else -1 if all enabled
+	 * Set ROI
+	 * @param i ROI
 	 * @return OK or FAIL
 	 */
-	virtual int setShortFrameEnable(const int i) = 0;
+	virtual int setROI(const std::vector<slsReceiverDefs::ROI> i) = 0;
 
 	/**
 	 * Set the Frequency of Frames Sent to GUI
@@ -497,12 +585,26 @@ class UDPInterface {
 	virtual void setSubExpTime(const uint64_t i) = 0;
 
 	/**
+	 * Set Sub Period
+	 * @param i Period
+	 * @return OK or FAIL
+	 */
+	virtual void setSubPeriod(const uint64_t i) = 0;
+
+	/**
 	 * Set Number of Frames expected by receiver from detector
-	 * The data receiver status will change from running to idle when it gets this number of frames FIXME: (Not implemented)
+	 * The data receiver status will change from running to idle when it gets this number of frames FIXME: (for Leo? Not implemented)
 	 * @param i number of frames expected
 	 * @return OK or FAIL
 	 */
 	virtual int setNumberOfFrames(const uint64_t i) = 0;
+
+	/**
+	 * Set Number of Samples expected by receiver from detector
+	 * @param i number of Samples expected
+	 * @return OK or FAIL
+	 */
+	virtual int setNumberofSamples(const uint64_t i) = 0;
 
 	/**
 	 * Set Dynamic Range or Number of Bits Per Pixel
@@ -529,9 +631,9 @@ class UDPInterface {
 	//***receiver parameters***
 	/**
 	 * Set Silent Mode
-	 * @param i silent mode. 1 sets, 0 unsets
+	 * @param i silent mode. true sets, false unsets
 	 */
-	virtual void setSilentMode(const uint32_t i) = 0;
+	virtual void setSilentMode(const bool i) = 0;
 
 
 	/*************************************************************************
@@ -596,16 +698,6 @@ class UDPInterface {
 	virtual void shutDownUDPSockets() = 0;
 
 	/**
-	 * Get the buffer-current frame read by receiver
-	 * @param ithread port thread index
-	 * @param c pointer to current file name
-	 * @param raw address of pointer, pointing to current frame to send to gui
-	 * @param startAcq start index of the acquisition
-	 * @param startFrame start index of the scan
-	 */
-	virtual void readFrame(int ithread, char* c,char** raw, int64_t &startAcq, int64_t &startFrame)=0;
-
-	/**
 	 * abort acquisition with minimum damage: close open files, cleanup.
 	 * does nothing if state already is 'idle'
 	 */
@@ -613,10 +705,21 @@ class UDPInterface {
 
 	/**
 	 * Activate / Deactivate Receiver
-	 * If deactivated, receiver will write dummy packets 0xFF
+	 * If deactivated, receiver will create dummy data if deactivated padding is enabled
 	 * (as it will receive nothing from detector)
+	 * @param enable enable
+	 * @return false for disabled, true for enabled
 	 */
-	virtual int setActivate(int enable = -1) = 0;
+	virtual bool setActivate(const bool enable) = 0;
+
+	/**
+	 * Set deactivated padding enable
+	 * If enabled, receiver will create dummy packets (0xFF), else it will create nothing
+	 * (as it will receive nothing from detector)
+	 * @param enable enable
+	 * @return false for disabled, true for enabled
+	 */
+	virtual bool setDeactivatedPadding(const bool enable) = 0;
 
 	/**
 	 * Set streaming port
@@ -625,6 +728,24 @@ class UDPInterface {
 	virtual void setStreamingPort(const uint32_t i) = 0;
 
 	/**
+	 * Set streaming source ip
+	 * @param c streaming source ip
+	 */
+	virtual void setStreamingSourceIP(const char* c) = 0;
+
+    /**
+     * Set additional json header
+     */
+    virtual void setAdditionalJsonHeader(const char* c) = 0;
+
+    /** (not saved in client shared memory)
+     * Set UDP Socket Buffer Size
+     * @param s UDP Socket Buffer Size
+     * @return OK or FAIL if dummy socket could be created
+     */
+    virtual int setUDPSocketBufferSize(const uint32_t s) = 0;
+
+	/*
 	 * Restream stop dummy packet from receiver
 	 * @return OK or FAIL
 	 */
@@ -656,24 +777,22 @@ class UDPInterface {
 	/**
 	 * Call back for raw data
 	 * args to raw data ready callback are
-	 * frameNumber is the frame number
-	 * expLength is the subframe number (32 bit eiger) or real time exposure time in 100ns (others)
-	 * packetNumber is the packet number
-	 * bunchId is the bunch id from beamline
-	 * timestamp is the time stamp with 10 MHz clock
-	 * modId is the unique module id (unique even for left, right, top, bottom)
-	 * xCoord is the x coordinate in the complete detector system
-	 * yCoord is the y coordinate in the complete detector system
-	 * zCoord is the z coordinate in the complete detector system
-	 * debug is for debugging purposes
-	 * roundRNumber is the round robin set number
-	 * detType is the detector type see :: detectorType
-	 * version is the version number of this structure format
+	 * sls_receiver_header frame metadata
 	 * dataPointer is the pointer to the data
-	 * dataSize in bytes is the size of the data in bytes
+	 * dataSize in bytes is the size of the data in bytes.
 	 */
-	virtual void registerCallBackRawDataReady(void (*func)(uint64_t, uint32_t, uint32_t, uint64_t, uint64_t, uint16_t, uint16_t, uint16_t, uint16_t, uint32_t, uint16_t, uint8_t, uint8_t,
+	virtual void registerCallBackRawDataReady(void (*func)(char* ,
 			char*, uint32_t, void*),void *arg) = 0;
+
+    /**
+     * Call back for raw data (modified)
+     * args to raw data ready callback are
+     * sls_receiver_header frame metadata
+     * dataPointer is the pointer to the data
+     * revDatasize is the reference of data size in bytes. Can be modified to the new size to be written/streamed. (only smaller value).
+     */
+    virtual void registerCallBackRawDataModifyReady(void (*func)(char* ,
+            char*, uint32_t &,void*),void *arg) = 0;
 
 
  protected:

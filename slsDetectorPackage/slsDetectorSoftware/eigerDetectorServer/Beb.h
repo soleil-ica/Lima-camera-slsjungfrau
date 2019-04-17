@@ -51,6 +51,7 @@ struct BebInfo{
   int Beb_SetMasterViaSoftware();
   int Beb_SetSlaveViaSoftware();
   int Beb_Activate(int enable);
+  int Beb_Set32bitOverflow(int val);
   int Beb_SetNetworkParameter(enum NETWORKINDEX mode, int val);
   int Beb_ResetToHardwareSettings();
   u_int32_t Beb_GetFirmwareRevision();
@@ -89,6 +90,10 @@ struct BebInfo{
 
   int Beb_GetBebFPGATemp();
 
+  void Beb_SetDetectorNumber(uint32_t detid);
+  int Beb_SetDetectorPosition(int pos[]);
+
+  uint16_t Beb_swap_uint16( uint16_t val);
   int Beb_open(u_int32_t** csp0base, u_int32_t offset);
   u_int32_t Beb_Read32 (u_int32_t* baseaddr, u_int32_t offset);
   u_int32_t Beb_Write32 (u_int32_t* baseaddr, u_int32_t offset, u_int32_t data);

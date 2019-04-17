@@ -1,6 +1,6 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
 
-<!--Converted with LaTeX2HTML 2008 (1.71)
+<!--Converted with LaTeX2HTML 2012 (1.2)
 original version by:  Nikos Drakos, CBLU, University of Leeds
 * revised and updated by:  Marcus Hennecke, Ross Moore, Herb Swan
 * with significant contributions from:
@@ -13,7 +13,7 @@ original version by:  Nikos Drakos, CBLU, University of Leeds
 <META NAME="resource-type" CONTENT="document">
 <META NAME="distribution" CONTENT="global">
 
-<META NAME="Generator" CONTENT="LaTeX2HTML v2008">
+<META NAME="Generator" CONTENT="LaTeX2HTML v2012">
 <META HTTP-EQUIV="Content-Style-Type" CONTENT="text/css">
 
 <LINK REL="STYLESHEET" HREF="slsDetectorInstall.css">
@@ -25,11 +25,11 @@ original version by:  Nikos Drakos, CBLU, University of Leeds
 <H3><A NAME="SECTION00053100000000000000">
 EIGER Firmware</A>
 </H3>
-<I>For SLS Detector Package v3.1.0</I> 
+<I>For SLS Detector Package v4.0.0</I> 
 <BR>
-Minimum compatible version:  16 
+Minimum compatible version:  22 
 <BR>
-Latest version:	20  
+Latest version:	22  
 <BR>
 <P>
 
@@ -40,6 +40,25 @@ Detector Group.
 <LI>If one does not have the bcp script, that should also be obtained from
 the SLS Detector Group. It is required to program the bit files and requires
 that tftp be installed on the pc.
+</LI>
+<LI>Bring the detector into programmable mode by either of the following ways.
+Both ways end up in just the central LED blinking.
+  
+<OL>
+<LI>hard reset on the back panel boards resulting in blinking LEDS 
+</LI>
+<LI>by having the following program running in the background. 
+    <PRE>
+    boot_recovery
+</PRE>
+</LI>
+</OL>
+</LI>
+<LI>Start a terminal for each half module and run the following to see 
+progress.
+<PRE>
+	nc -p 3000 -u bebxxx 3000
+</PRE>
 </LI>
 <LI>Run the following to update firmware
 <PRE>
