@@ -6,19 +6,28 @@
 
 
 //daq register definitions
-#define DAQ_REG_CTRL                  1
-#define DAQ_REG_CHIP_CMDS             2
-#define DAQ_REG_STATIC_BITS           3
-#define DAQ_REG_CLK_ROW_CLK_NTIMES    3
-#define DAQ_REG_SHIFT_IN_32           3
-#define DAQ_REG_READOUT_NROWS         3
-#define DAQ_REG_SEND_N_TESTPULSES     3
+#define DAQ_REG_CTRL                  	1
+#define DAQ_REG_CHIP_CMDS             	2
+#define DAQ_REG_STATIC_BITS           	3
+#define DAQ_REG_CLK_ROW_CLK_NTIMES    	3
+#define DAQ_REG_SHIFT_IN_32           	3
+#define DAQ_REG_READOUT_NROWS         	3
+#define DAQ_REG_SEND_N_TESTPULSES     	3
 
-#define DAQ_REG_NEXPOSURES            3
-#define DAQ_REG_EXPOSURE_TIMER        4 // == (31 downto 3) * 10^(2 downto 0) 
-#define DAQ_REG_EXPOSURE_REPEAT_TIMER 5 // == (31 downto 3) * 10^(2 downto 0) 
-#define DAQ_REG_SUBFRAME_EXPOSURES    6
-#define DAQ_REG_STATUS                7 //also pg and fifo status register
+#define DAQ_REG_NEXPOSURES            	3
+#define DAQ_REG_EXPOSURE_TIMER        	4 // == (31 downto 3) * 10^(2 downto 0)
+#define DAQ_REG_EXPOSURE_REPEAT_TIMER 	5 // == (31 downto 3) * 10^(2 downto 0)
+#define DAQ_REG_SUBFRAME_EXPOSURES   	6
+#define DAQ_REG_SUBFRAME_PERIOD       	7 //also pg and fifo status register
+
+
+#define DAQ_REG_RO_OFFSET				12
+#define DAQ_REG_STATUS					(DAQ_REG_RO_OFFSET + 0) //also pg and fifo status register
+#define FEB_REG_STATUS              	(DAQ_REG_RO_OFFSET + 3)
+#define MEAS_SUBPERIOD_REG 	 			(DAQ_REG_RO_OFFSET + 4)
+#define MEAS_PERIOD_REG   				(DAQ_REG_RO_OFFSET + 5)
+
+
 
 #define DAQ_CTRL_RESET              0x80000000
 #define DAQ_CTRL_START              0x40000000
@@ -55,7 +64,8 @@
 #define DAQ_CHIP_CONTROLLER_QUARTER_SPEED      0x00080000 //everything at  50 MHz (25MHz ddr readout)
 #define DAQ_CHIP_CONTROLLER_SUPER_SLOW_SPEED   0x000c0000 //everything at  ~200 kHz (200 kHz MHz ddr readout)
 
-#define DAQ_FIFO_ENABLE                        0x00100000
+//#define DAQ_FIFO_ENABLE                       0x00100000 commented out as it is not used anywhere
+#define DAQ_REG_CHIP_CMDS_INT_TRIGGER			0x00100000
 
 //direct chip commands to the DAQ_REG_CHIP_CMDS register
 #define DAQ_NEXPOSURERS_SAFEST_MODE_ROW_CLK_BEFORE_MODE 0x00200000 //row clk is before main clk readout sequence
@@ -130,7 +140,12 @@
 #define TXM_DELAY_LEFT_OFFSET		0x180
 #define TXM_DELAY_RIGHT_OFFSET		0x1A0
 #define TXM_DELAY_FRAME_OFFSET		0x1C0
-#define TXM_FLOW_CONTROL_10G		0x140
+#define FLOW_REG_OFFSET				0x140
+
+#define FLOW_REG_TXM_FLOW_CNTRL_10G_OFST	(0)
+#define FLOW_REG_TXM_FLOW_CNTRL_10G_MSK		(0x1 << FLOW_REG_TXM_FLOW_CNTRL_10G_OFST)
+#define FLOW_REG_OVERFLOW_32_BIT_OFST		(2)
+#define FLOW_REG_OVERFLOW_32_BIT_MSK		(0x1 << FLOW_REG_OVERFLOW_32_BIT_OFST)
 
 //command memory
 #define LEFT_OFFSET					0x0
@@ -151,9 +166,6 @@
 #define FIRMWARESOFTWARE_API_OFFSET 0x0
 
 #define FRAME_NUM_RESET_OFFSET		0xA0
-
-//temp so far
-#define FEB_REG_STATUS              0xa
 
 //1g counters
 #define ONE_GIGA_LEFT_INDEX_LSB_COUNTER		0x04
@@ -181,8 +193,20 @@
 #define TEN_GIGA_RIGHT_TXN_DELAY_COUNTER	0x1c4
 #define TEN_GIGA_RIGHT_FRAME_DELAY_COUNTER	0x1e4
 
+// udp header (position, id)
+#define UDP_HEADER_A_LEFT_OFST				0x00C0
+#define UDP_HEADER_B_LEFT_OFST				0x00E0
+#define UDP_HEADER_A_RIGHT_OFST				0x0100
+#define UDP_HEADER_B_RIGHT_OFST				0x0120
 
-
+#define UDP_HEADER_X_OFST					(0)
+#define UDP_HEADER_X_MSK					(0xFFFF << UDP_HEADER_X_OFST)
+#define UDP_HEADER_ID_OFST					(16)
+#define UDP_HEADER_ID_MSK					(0xFFFF << UDP_HEADER_ID_OFST)
+#define UDP_HEADER_Z_OFST					(0)
+#define UDP_HEADER_Z_MSK					(0xFFFF << UDP_HEADER_Z_OFST)
+#define UDP_HEADER_Y_OFST					(16)
+#define UDP_HEADER_Y_MSK					(0xFFFF << UDP_HEADER_Y_OFST)
 
 
 

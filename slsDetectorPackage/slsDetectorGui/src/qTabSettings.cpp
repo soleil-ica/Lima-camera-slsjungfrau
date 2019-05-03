@@ -38,7 +38,10 @@ void qTabSettings::SetupWidgetWindow(){
 	detType=myDet->getDetectorsType();
 
 	// Settings
-	SetupDetectorSettings();
+	if (detType != slsReceiverDefs::JUNGFRAUCTB) {
+		SetupDetectorSettings();
+	} else
+		comboSettings->setEnabled(false);
 
 	//threshold
 	if((detType == slsDetectorDefs::MYTHEN) || (detType == slsDetectorDefs::EIGER))
@@ -104,7 +107,7 @@ void qTabSettings::SetupDetectorSettings(){
 	int sett = (int)myDet->getSettings();cout<<"sett:"<<sett<<endl;
 	qDefs::checkErrorMessage(myDet,"qTabSettings::SetupDetectorSettings");
 	if(sett==-1) sett = Undefined;
-	else if(sett == slsDetectorDefs::UNDEFINED) sett = Undefined;
+	if(sett == slsDetectorDefs::UNDEFINED) sett = Undefined;
 	else if(sett == slsDetectorDefs::UNINITIALIZED) sett = Uninitialized;
 	// To be able to index items on a combo box
 	model = qobject_cast<QStandardItemModel*>(comboSettings->model());
@@ -184,7 +187,7 @@ void qTabSettings::SetupDetectorSettings(){
 		default:
 			cout << "Unknown detector type. Exiting GUI." << endl;
 			qDefs::Message(qDefs::CRITICAL,"Unknown detector type. Exiting GUI.","qTabSettings::SetupDetectorSettings");
-			exit(-1);
+		exit(-1);
 			break;
 		}
 		// detector settings selected NOT ENABLED.
@@ -195,7 +198,8 @@ void qTabSettings::SetupDetectorSettings(){
 #ifdef VERBOSE
 			cout << "ERROR:  Unknown Detector Settings retrieved from detector." << endl;
 #endif
-			exit(-1);
+			sett= Undefined;
+			//	exit(-1);
 		}
 		// Setting the detector settings
 		else	comboSettings->setCurrentIndex(sett);
@@ -206,7 +210,8 @@ void qTabSettings::SetupDetectorSettings(){
 
 void qTabSettings::Initialization(){
 	// Settings
-	connect(comboSettings, 		SIGNAL(currentIndexChanged(int)),	this, SLOT(setSettings(int)));
+	if (detType != slsReceiverDefs::JUNGFRAUCTB)
+		connect(comboSettings, 		SIGNAL(currentIndexChanged(int)),	this, SLOT(setSettings(int)));
 	// Number of Modules
 	connect(spinNumModules, 	SIGNAL(valueChanged(int)), 			this, SLOT(SetNumberOfModules(int)));
 	// Dynamic Range
@@ -224,7 +229,7 @@ void qTabSettings::setSettings(int index){
 		disconnect(comboSettings, 		SIGNAL(currentIndexChanged(int)),	this, SLOT(setSettings(int)));
 		int sett = (int)myDet->getSettings();
 		if(sett==-1) sett = Undefined;
-		else if(sett == slsDetectorDefs::UNDEFINED) sett = Undefined;
+		if(sett == slsDetectorDefs::UNDEFINED) sett = Undefined;
 		else if(sett == slsDetectorDefs::UNINITIALIZED) sett = Uninitialized;
 		comboSettings->setCurrentIndex(sett);
 		connect(comboSettings, 		SIGNAL(currentIndexChanged(int)),	this, SLOT(setSettings(int)));
@@ -317,7 +322,8 @@ void qTabSettings::Refresh(){
 	cout  << endl << "**Updating Settings Tab" << endl;
 #endif
 
-	disconnect(comboSettings, 		SIGNAL(currentIndexChanged(int)),	this, SLOT(setSettings(int)));
+	if (detType != slsReceiverDefs::JUNGFRAUCTB)
+		disconnect(comboSettings, 		SIGNAL(currentIndexChanged(int)),	this, SLOT(setSettings(int)));
 	disconnect(spinNumModules, 	SIGNAL(valueChanged(int)), 			this, SLOT(SetNumberOfModules(int)));
 	disconnect(spinThreshold,		SIGNAL(valueChanged(int)),			this, SLOT(SetEnergy()));
 
@@ -336,34 +342,35 @@ void qTabSettings::Refresh(){
 	GetDynamicRange();
 
 	// Settings
+	if (detType != slsReceiverDefs::JUNGFRAUCTB)  {
 #ifdef VERBOSE
-	cout  << "Getting settings" << endl;
+		cout  << "Getting settings" << endl;
 #endif
-	int sett = (int)myDet->getSettings();
-	if(sett==-1) sett = Undefined;//slsDetectorDefs::UNDEFINED;
-	else if(sett == slsDetectorDefs::UNDEFINED) sett = Undefined;
-	else if(sett == slsDetectorDefs::UNINITIALIZED) sett = Uninitialized;
-	comboSettings->setCurrentIndex(sett);
+		int sett = (int)myDet->getSettings();
+		if(sett==-1) sett = Undefined;//slsDetectorDefs::UNDEFINED;
+		if(sett == slsDetectorDefs::UNDEFINED) sett = Undefined;
+		else if(sett == slsDetectorDefs::UNINITIALIZED) sett = Uninitialized;
+		comboSettings->setCurrentIndex(sett);
 
-
-	//threshold
-	sett = comboSettings->currentIndex();
-	if((detType==slsDetectorDefs::MYTHEN)||(detType==slsDetectorDefs::EIGER)){
-		if((sett==Undefined)||(sett==Uninitialized)){
-			lblThreshold->setEnabled(false);
-			spinThreshold->setEnabled(false);
-		}else{
-			lblThreshold->setEnabled(true);
-			spinThreshold->setEnabled(true);
+		//threshold
+		sett = comboSettings->currentIndex();
+		if((detType==slsDetectorDefs::MYTHEN)||(detType==slsDetectorDefs::EIGER)){
+			if((sett==Undefined)||(sett==Uninitialized)){
+				lblThreshold->setEnabled(false);
+				spinThreshold->setEnabled(false);
+			}else{
+				lblThreshold->setEnabled(true);
+				spinThreshold->setEnabled(true);
 #ifdef VERBOSE
-			cout  << "Getting threshold energy" << endl;
+				cout  << "Getting threshold energy" << endl;
 #endif
-			spinThreshold->setValue(myDet->getThresholdEnergy());
+				spinThreshold->setValue(myDet->getThresholdEnergy());
+			}
 		}
-	}
+}
 
-
-	connect(comboSettings, 		SIGNAL(currentIndexChanged(int)),	this, SLOT(setSettings(int)));
+	if (detType != slsReceiverDefs::JUNGFRAUCTB)
+		connect(comboSettings, 		SIGNAL(currentIndexChanged(int)),	this, SLOT(setSettings(int)));
 	connect(spinNumModules, 	SIGNAL(valueChanged(int)), 			this, SLOT(SetNumberOfModules(int)));
 	connect(spinThreshold,		SIGNAL(valueChanged(int)),			this, SLOT(SetEnergy()));
 

@@ -2,11 +2,18 @@
 #include "slsReceiver.h"
 
 slsReceiverUsers::slsReceiverUsers(int argc, char *argv[], int &success) {
-	receiver=new slsReceiver(argc, argv, success);
+	// catch the exception here to limit it to within the library (for current version)
+	try {
+		slsReceiver* r = new slsReceiver(argc, argv);
+		receiver = r;
+		success = slsReceiverDefs::OK;
+	} catch (...) {
+		success = slsReceiverDefs::FAIL;
+	}
 }
 
 slsReceiverUsers::~slsReceiverUsers() {
-  delete receiver;
+	delete receiver;
 }
 
 int slsReceiverUsers::start() {
@@ -28,10 +35,13 @@ void slsReceiverUsers::registerCallBackStartAcquisition(int (*func)(char*, char*
 void slsReceiverUsers::registerCallBackAcquisitionFinished(void (*func)(uint64_t, void*),void *arg){
 	receiver->registerCallBackAcquisitionFinished(func,arg);
 }
-	
-void slsReceiverUsers::registerCallBackRawDataReady(void (*func)(uint64_t frameNumber, uint32_t expLength, uint32_t packetNumber, uint64_t bunchId, uint64_t timestamp,
-		uint16_t modId, uint16_t xCoord, uint16_t yCoord, uint16_t zCoord, uint32_t debug, uint16_t roundRNumber, uint8_t detType, uint8_t version,
+
+void slsReceiverUsers::registerCallBackRawDataReady(void (*func)(char* header,
 		char* datapointer, uint32_t datasize, void*), void *arg){
 	receiver->registerCallBackRawDataReady(func,arg);
 }
 
+void slsReceiverUsers::registerCallBackRawDataModifyReady(void (*func)(char* header,
+		char* datapointer, uint32_t& revDatasize, void*), void *arg){
+	receiver->registerCallBackRawDataModifyReady(func,arg);
+}

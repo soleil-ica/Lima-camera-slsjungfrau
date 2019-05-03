@@ -1,4 +1,4 @@
-# LaTeX2HTML 2008 (1.71)
+# LaTeX2HTML 2012 (1.2)
 # Associate images original text with physical files.
 
 
@@ -10,7 +10,7 @@ $cached_env_img{$key} = q|<IMG
 
 $key = q/O;MSF=1.6;AAT/;
 $cached_env_img{$key} = q|<IMG
- WIDTH="17" HEIGHT="14" ALIGN="BOTTOM" BORDER="0"
+ WIDTH="17" HEIGHT="15" ALIGN="BOTTOM" BORDER="0"
  SRC="|."$dir".q|img25.png"
  ALT="$O$">|; 
 
@@ -28,7 +28,7 @@ $cached_env_img{$key} = q|<IMG
 
 $key = q/includegraphics[width=textwidth]{calibrateModule.eps};AAT/;
 $cached_env_img{$key} = q|<IMG
- WIDTH="555" HEIGHT="694" ALIGN="BOTTOM" BORDER="0"
+ WIDTH="514" HEIGHT="654" ALIGN="BOTTOM" BORDER="0"
  SRC="|."$dir".q|img40.png"
  ALT="\includegraphics[width=\textwidth]{calibrateModule.eps}">|; 
 
@@ -54,7 +54,7 @@ $cached_env_img{$key} = q|<IMG
 
 $key = q/ENC;MSF=1.6;AAT/;
 $cached_env_img{$key} = q|<IMG
- WIDTH="44" HEIGHT="14" ALIGN="BOTTOM" BORDER="0"
+ WIDTH="44" HEIGHT="15" ALIGN="BOTTOM" BORDER="0"
  SRC="|."$dir".q|img3.png"
  ALT="$ENC$">|; 
 
@@ -84,7 +84,7 @@ $cached_env_img{$key} = q|<IMG
 
 $key = q/G;MSF=1.6;AAT/;
 $cached_env_img{$key} = q|<IMG
- WIDTH="17" HEIGHT="14" ALIGN="BOTTOM" BORDER="0"
+ WIDTH="17" HEIGHT="15" ALIGN="BOTTOM" BORDER="0"
  SRC="|."$dir".q|img26.png"
  ALT="$G$">|; 
 
@@ -182,7 +182,7 @@ $cached_env_img{$key} = q|<IMG
 
 $key = q/includegraphics[width=textwidth]{addEnergy.eps};AAT/;
 $cached_env_img{$key} = q|<IMG
- WIDTH="555" HEIGHT="694" ALIGN="BOTTOM" BORDER="0"
+ WIDTH="514" HEIGHT="654" ALIGN="BOTTOM" BORDER="0"
  SRC="|."$dir".q|img39.png"
  ALT="\includegraphics[width=\textwidth]{addEnergy.eps}">|; 
 
@@ -194,13 +194,13 @@ $cached_env_img{$key} = q|<IMG
 
 $key = q/CS={begingroup{N_Sbegingroup{overN_0};MSF=1.6;AAT/;
 $cached_env_img{$key} = q|<IMG
- WIDTH="24" HEIGHT="11" ALIGN="BOTTOM" BORDER="0"
+ WIDTH="24" HEIGHT="12" ALIGN="BOTTOM" BORDER="0"
  SRC="|."$dir".q|img6.png"
  ALT="$CS={\begingroupN_S\endgroup\over N_0}$">|; 
 
 $key = q/CS=;MSF=1.6;AAT/;
 $cached_env_img{$key} = q|<IMG
- WIDTH="45" HEIGHT="14" ALIGN="BOTTOM" BORDER="0"
+ WIDTH="45" HEIGHT="15" ALIGN="BOTTOM" BORDER="0"
  SRC="|."$dir".q|img4.png"
  ALT="$CS=$">|; 
 

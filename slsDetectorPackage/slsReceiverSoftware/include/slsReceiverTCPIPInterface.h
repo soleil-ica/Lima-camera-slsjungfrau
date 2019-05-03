@@ -26,21 +26,12 @@ class slsReceiverTCPIPInterface : private virtual slsReceiverDefs {
 	/**
 	 * Constructor
 	 * reads config file, creates socket, assigns function table
-	 * @param succecc socket creation was successfull
-	 * @param rbase pointer to the receiver base
+	 * throws an exception in case of failure to construct
 	 * @param pn port number (defaults to default port number)
 	 */
 
-  slsReceiverTCPIPInterface(int &success, UDPInterface* rbase, int pn=-1);
+  slsReceiverTCPIPInterface(int pn=-1);
 
-	/**
-	 * Sets the port number to listen to. 
-	 Take care that the client must know to whcih port it has to listen to, so normally it is better to use a fixes port from the instatiation or change it from the client.
-	 @param pn port number (-1 only get)
-	 \returns actual port number
-	*/
-	int setPortNumber(int pn=-1);
-	
 	/**
 	 * Starts listening on the TCP port for client comminication
 	 \returns OK or FAIL
@@ -79,24 +70,23 @@ class slsReceiverTCPIPInterface : private virtual slsReceiverDefs {
 	/**
 	 * Call back for raw data
 	 * args to raw data ready callback are
-	 * frameNumber is the frame number
-	 * expLength is the subframe number (32 bit eiger) or real time exposure time in 100ns (others)
-	 * packetNumber is the packet number
-	 * bunchId is the bunch id from beamline
-	 * timestamp is the time stamp with 10 MHz clock
-	 * modId is the unique module id (unique even for left, right, top, bottom)
-	 * xCoord is the x coordinate in the complete detector system
-	 * yCoord is the y coordinate in the complete detector system
-	 * zCoord is the z coordinate in the complete detector system
-	 * debug is for debugging purposes
-	 * roundRNumber is the round robin set number
-	 * detType is the detector type see :: detectorType
-	 * version is the version number of this structure format
+	 * sls_receiver_header frame metadata
 	 * dataPointer is the pointer to the data
-	 * dataSize in bytes is the size of the data in bytes
+	 * dataSize in bytes is the size of the data in bytes.
 	 */
-	void registerCallBackRawDataReady(void (*func)(uint64_t, uint32_t, uint32_t, uint64_t, uint64_t, uint16_t, uint16_t, uint16_t, uint16_t, uint32_t, uint16_t, uint8_t, uint8_t,
+	void registerCallBackRawDataReady(void (*func)(char* ,
 			char*, uint32_t, void*),void *arg);
+
+    /**
+     * Call back for raw data (modified)
+     * args to raw data ready callback are
+     * sls_receiver_header frame metadata
+     * dataPointer is the pointer to the data
+     * revDatasize is the reference of data size in bytes.
+     * Can be modified to the new size to be written/streamed. (only smaller value).
+     */
+    void registerCallBackRawDataModifyReady(void (*func)(char* ,
+            char*, uint32_t &,void*),void *arg);
 
  private:
 
@@ -173,8 +163,8 @@ class slsReceiverTCPIPInterface : private virtual slsReceiverDefs {
 	/** set detector hostname  */
 	int set_detector_hostname();
 
-	/** set short frame */
-	int set_short_frame();
+	/** set roi */
+	int set_roi();
 
 	/** Set up UDP Details */
 	int setup_udp();
@@ -201,9 +191,6 @@ class slsReceiverTCPIPInterface : private virtual slsReceiverDefs {
 	 * when fifo is empty later, sets status to run_finished */
 	int start_readout();
 
-	/** Reads Frame/ buffer */
-	int	read_frame();
-
 	/** Set File path */
 	int set_file_dir();
 
@@ -212,9 +199,6 @@ class slsReceiverTCPIPInterface : private virtual slsReceiverDefs {
 
 	/** Set File index */
 	int set_file_index();
-
-	/** Set Frame index */
-	int set_frame_index();
 
 	/** Gets frame index for each acquisition */
 	int	get_frame_index();
@@ -264,12 +248,41 @@ class slsReceiverTCPIPInterface : private virtual slsReceiverDefs {
 	/** set streaming port */
 	int set_streaming_port();
 
+	/** set streaming source ip */
+	int set_streaming_source_ip();
+
 	/** set silent mode */
 	int set_silent_mode();
+
+	/** enable gap pixels */
+	int enable_gap_pixels();
 
 	/** restream stop packet */
 	int restream_stop();
 
+    /** set additional json header */
+    int set_additional_json_header();
+
+    /** set udp socket buffer size */
+    int set_udp_socket_buffer_size();
+
+    /** get real udp socket buffer size */
+    int get_real_udp_socket_buffer_size();
+
+    /** set frames per file */
+    int set_frames_per_file();
+
+    /** check version compatibility */
+    int check_version_compatibility();
+
+    /** set frame discard policy */
+    int set_discard_policy();
+
+    /** set partial frame padding enable*/
+    int set_padding_enable();
+
+    /** set deactivated receiver padding enable */
+    int set_deactivated_receiver_padding_enable();
 
 
 	/** detector type */
@@ -298,6 +311,9 @@ class slsReceiverTCPIPInterface : private virtual slsReceiverDefs {
 
 	/** thread for TCP server */
 	pthread_t   TCPServer_thread;
+
+	/** tcp thread created flag*/
+	bool tcpThreadCreated;
 
 	/** port number */
 	int portNumber;
@@ -330,24 +346,23 @@ class slsReceiverTCPIPInterface : private virtual slsReceiverDefs {
 	/**
 	 * Call back for raw data
 	 * args to raw data ready callback are
-	 * frameNumber is the frame number
-	 * expLength is the subframe number (32 bit eiger) or real time exposure time in 100ns (others)
-	 * packetNumber is the packet number
-	 * bunchId is the bunch id from beamline
-	 * timestamp is the time stamp with 10 MHz clock
-	 * modId is the unique module id (unique even for left, right, top, bottom)
-	 * xCoord is the x coordinate in the complete detector system
-	 * yCoord is the y coordinate in the complete detector system
-	 * zCoord is the z coordinate in the complete detector system
-	 * debug is for debugging purposes
-	 * roundRNumber is the round robin set number
-	 * detType is the detector type see :: detectorType
-	 * version is the version number of this structure format
+	 * sls_receiver_header frame metadata
 	 * dataPointer is the pointer to the data
-	 * dataSize in bytes is the size of the data in bytes
+	 * dataSize in bytes is the size of the data in bytes.
 	 */
-	void (*rawDataReadyCallBack)(uint64_t, uint32_t, uint32_t, uint64_t, uint64_t, uint16_t, uint16_t, uint16_t, uint16_t, uint32_t, uint16_t, uint8_t, uint8_t,
+	void (*rawDataReadyCallBack)(char* ,
 			char*, uint32_t, void*);
+
+    /**
+     * Call back for raw data (modified)
+     * args to raw data ready callback are
+     * sls_receiver_header frame metadata
+     * dataPointer is the pointer to the data
+     * revDatasize is the reference of data size in bytes. Can be modified to the new size to be written/streamed. (only smaller value).
+     */
+    void (*rawDataModifyReadyCallBack)(char* ,
+            char*, uint32_t &, void*);
+
 	void *pRawDataReady;
 
 

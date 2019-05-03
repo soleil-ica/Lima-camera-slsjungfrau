@@ -67,10 +67,21 @@ namespace lima
             // gets the timestamp
             uint64_t getTimestamp() const;
 
+            // fill the internal image
+            void setImage(const char *   in_data_pointer,
+                          const uint32_t in_data_size   );
+
+            // clear the internal image to free the memory
+            void clearImage();
+
+            // get a reference to the internal image
+            const std::vector<uint16_t> & getImage() const;
+
         private:
-            uint64_t m_index        ; // frame index (starts at 0)
-            uint32_t m_packet_number; // number of packets caught for this frame
-            uint64_t m_timestamp    ; // time stamp in 10MHz clock
+            uint64_t              m_index        ; // frame index (starts at 0)
+            uint32_t              m_packet_number; // number of packets caught for this frame
+            uint64_t              m_timestamp    ; // time stamp in 10MHz clock
+            std::vector<uint16_t> m_image        ; // buffer used to store the image sent by the detector 
         }; 
     }
 }

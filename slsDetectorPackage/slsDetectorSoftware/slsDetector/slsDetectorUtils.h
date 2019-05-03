@@ -31,7 +31,7 @@ extern "C" {
 #include <math.h>
 #include <semaphore.h>
 #include <cstdlib>
-using namespace std;
+
 
 
 //#include "slsDetectorActions_Standalone.h"
@@ -63,6 +63,10 @@ class slsDetectorUtils :  public slsDetectorActions, public postProcessing {
     
   virtual ~slsDetectorUtils(){};
 
+  /**
+   * Used when reference is slsDetectorUtils and to determine if command can be implemented as slsDetector/multiSlsDetector object/
+   */
+  virtual bool isMultiSlsDetectorClass()=0;
 
   virtual int getNumberOfDetectors(){return 1; };
   
@@ -77,6 +81,13 @@ class slsDetectorUtils :  public slsDetectorActions, public postProcessing {
    *  \return enable flipped data across x or y axis
    */
   virtual int setFlippedData(dimension d=X, int value=-1)=0;
+
+  /**
+   * Enable gap pixels, only for Eiger and for 8,16 and 32 bit mode. 4 bit mode gap pixels only in gui call back
+   * @param val 1 sets, 0 unsets, -1 gets
+   * @return gap pixel enable or -1 for error
+   */
+  virtual int enableGapPixels(int val=-1) = 0;
 
   //int setPositions(int nPos, double *pos){return angularConversion::setPositions(nPos, pos);};
 
@@ -99,7 +110,7 @@ class slsDetectorUtils :  public slsDetectorActions, public postProcessing {
    */
   int setReceiverDataStreamingOutPort(int i) {								\
 	  if (i >= 0) {															\
-		  ostringstream ss; ss << i; string s = ss.str();					\
+		  std::ostringstream ss; ss << i; std::string s = ss.str();					\
 		  int prev_streaming = enableDataStreamingFromReceiver();			\
 		  setNetworkParameter(RECEIVER_STREAMING_PORT, s);					\
 		  if (prev_streaming) {												\
@@ -115,7 +126,7 @@ class slsDetectorUtils :  public slsDetectorActions, public postProcessing {
    */
   int setClientDataStreamingInPort(int i){										\
 		  if (i >= 0) {															\
-			  ostringstream ss; ss << i; string s = ss.str();					\
+			  std::ostringstream ss; ss << i; std::string s = ss.str();					\
 			  int prev_streaming = enableDataStreamingToClient();				\
 			  setNetworkParameter(CLIENT_STREAMING_PORT, s);					\
 			  if (prev_streaming) {												\
@@ -123,6 +134,35 @@ class slsDetectorUtils :  public slsDetectorActions, public postProcessing {
 				  enableDataStreamingToClient(1);}}								\
 		  return atoi(getNetworkParameter(CLIENT_STREAMING_PORT).c_str());};	\
 
+  /**
+   * Set/Get receiver streaming out ZMQ port
+   * For multi modules, it calculates (increments) and sets the ports
+   * @param i sets, -1 gets
+   * @returns receiver streaming out ZMQ port
+   */
+   std::string setReceiverDataStreamingOutIP(std::string ip) {							\
+		if (ip.length()) {														\
+			int prev_streaming = enableDataStreamingFromReceiver();				\
+			setNetworkParameter(RECEIVER_STREAMING_SRC_IP, ip);					\
+			if (prev_streaming) {												\
+				enableDataStreamingFromReceiver(0);								\
+				enableDataStreamingFromReceiver(1);}}							\
+		return getNetworkParameter(RECEIVER_STREAMING_SRC_IP);};				\
+
+  /**
+   * Set/Get client streaming in ZMQ port
+   * For multi modules, it calculates (increments) and sets the ports
+   * @param i sets, -1 gets
+   * @returns client streaming in ZMQ port
+   */
+   std::string setClientDataStreamingInIP(std::string ip){								\
+		if (ip.length()) {														\
+			int prev_streaming = enableDataStreamingToClient();					\
+			setNetworkParameter(CLIENT_STREAMING_SRC_IP, ip);					\
+			if (prev_streaming) {												\
+				enableDataStreamingToClient(0);									\
+				enableDataStreamingToClient(1);}}								\
+		return getNetworkParameter(CLIENT_STREAMING_SRC_IP);};					\
 
 // string getFilePath(){return fileIO::getFilePath();};;
   // string setFilePath(string s){return fileIO::setFilePath(s);};
@@ -159,47 +199,24 @@ class slsDetectorUtils :  public slsDetectorActions, public postProcessing {
       \param pos position in the multi detector structure (is -1 returns concatenated hostnames divided by a +)
       \returns hostname
   */
-  virtual string getHostname(int pos=-1)=0;
+  virtual std::string getHostname(int pos=-1)=0;
 
   
   /** sets the detector hostname   
       \param name hostname
-      \param pos position in the multi detector structure (is -1 expects concatenated hostnames divided by a +)
-      \returns  hostname  
   */
-  virtual string setHostname(const char* name, int pos=-1)=0;
+  virtual void setHostname(const char* name)=0;
 
+  /** adds the detector hostnames to the end of the list
+      \param name hostname
+  */
+  virtual void addMultipleDetectors(const char* name)=0;
 
   /** returns the detector type
       \param pos position in the multi detector structure (is -1 returns type of detector with id -1)
       \returns type
   */
-  virtual string sgetDetectorsType(int pos=-1)=0;
-
-  /** returns the detector type
-      \param pos position in the multi detector structure (is -1 returns type of detector with id -1)
-      \returns type
-  */
-  virtual detectorType setDetectorsType(detectorType t=GET_DETECTOR_TYPE, int pos=-1)=0;
-  virtual string ssetDetectorsType(detectorType t=GET_DETECTOR_TYPE, int pos=-1)=0;
-  virtual string ssetDetectorsType(string s, int pos=-1)=0;
-
-
-  
-  /** Gets the detector id (shared memory id) of an slsDetector
-      \param i position in the multiSlsDetector structure
-      \return id or -1 if FAIL
-  */
-  virtual int getDetectorId(int i=-1)=0;
-
-  /** Sets the detector id (shared memory id) of an slsDetector in a multiSlsDetector structure
-      \param ival id to be set
-      \param i position in the multiSlsDetector structure
-      \return id or -1 if FAIL  (e.g. in case of an slsDetector)
-  */
-  virtual int setDetectorId(int ival, int i=-1){return -1;};
-
-
+  virtual std::string sgetDetectorsType(int pos=-1)=0;
 
   /**
      gets the network parameters (implemented for gotthard)
@@ -207,7 +224,7 @@ class slsDetectorUtils :  public slsDetectorActions, public postProcessing {
      \returns parameter
 
   */
-  virtual string getNetworkParameter(networkParameter i)=0;
+  virtual std::string getNetworkParameter(networkParameter i)=0;
 
   /**
      sets the network parameters
@@ -217,7 +234,20 @@ class slsDetectorUtils :  public slsDetectorActions, public postProcessing {
      \returns parameter
 
   */
-  virtual string setNetworkParameter(networkParameter i, string s)=0;
+  virtual std::string setNetworkParameter(networkParameter i, std::string s)=0;
+
+  int setFlowControl10G(int i = -1) {
+      std::string sret="";
+      if (i != -1) {
+          std::ostringstream o;
+          o << ((i >= 1) ? 1 : 0);
+          std::string sval = o.str();
+          sret = setNetworkParameter(FLOW_CONTROL_10G, sval);
+      } else
+          sret = getNetworkParameter(FLOW_CONTROL_10G);
+
+      return atoi(sret.c_str());
+  }
 
   /**
      changes/gets the port number
@@ -231,7 +261,7 @@ class slsDetectorUtils :  public slsDetectorActions, public postProcessing {
      checks if the detector(s) are online/offline
      \returns hostname if offline
   */
-  virtual string checkOnline()=0;
+  virtual std::string checkOnline()=0;
 
   /**
      Digital test of the modules
@@ -255,15 +285,23 @@ class slsDetectorUtils :  public slsDetectorActions, public postProcessing {
   /**
      returns currently the loaded trimfile/settingsfile name
   */
-  virtual string getSettingsFile()=0;
+  virtual std::string getSettingsFile()=0;
 
   
   /** 
       get current timer value
       \param index timer index
+      \param imod module number
       \returns elapsed time value in ns or number of...(e.g. frames, gates, probes)
   */
-  virtual int64_t getTimeLeft(timerIndex index)=0;
+  virtual int64_t getTimeLeft(timerIndex index, int imod = -1)=0;
+
+  /**
+   * set storage cell that stores first acquisition of the series (Jungfrau only)
+   * \param value storage cell index. Value can be 0 to 15. (-1 gets)
+   * \returns the storage cell that stores the first acquisition of the series
+   */
+  virtual int setStoragecellStart(int pos=-1)=0;
 
 
 
@@ -322,7 +360,7 @@ class slsDetectorUtils :  public slsDetectorActions, public postProcessing {
 
 
 
-  int setBadChannelCorrection(string fname, int &nbadtot, int *badchanlist, int off=0);
+  int setBadChannelCorrection(std::string fname, int &nbadtot, int *badchanlist, int off=0);
 
 
 
@@ -345,32 +383,29 @@ class slsDetectorUtils :  public slsDetectorActions, public postProcessing {
   /** 
       returns the detector trimbit/settings directory   
   */
-  virtual char* getSettingsDir()=0;
+  virtual std::string getSettingsDir()=0;
 
   /** sets the detector trimbit/settings directory  */
-  virtual char* setSettingsDir(string s)=0;
+  virtual std::string setSettingsDir(std::string s)=0;
 
   /**
      returns the location of the calibration files
   */
-  virtual char* getCalDir()=0; 
+  virtual std::string getCalDir()=0; 
 
   /**
      sets the location of the calibration files
   */
-  virtual char* setCalDir(string s)=0;
+  virtual std::string setCalDir(std::string s)=0;
 
   /** Frees the shared memory  -  should not be used except for debugging*/
-  virtual int freeSharedMemory()=0;
+  virtual void freeSharedMemory()=0;
 
-
-  /** adds the detector with ID id in postion pos
-      \param id of the detector to be added (should already exist!)
-      \param pos position where it should be added (normally at the end of the list (default to -1)
-      \returns the actual number of detectors or -1 if it failed (always for slsDetector)
-  */
-  virtual int addSlsDetector(int id, int pos=-1){return -1;};
-
+	/**
+	 * Get user details of shared memory
+	 * @returns string with user details
+	 */
+  virtual std::string getUserDetails() = 0;
 
   /** adds the detector name in position pos
       \param name of the detector to be added (should already exist in shared memory or at least be online) 
@@ -379,19 +414,6 @@ class slsDetectorUtils :  public slsDetectorActions, public postProcessing {
   */
   virtual int addSlsDetector(char* name, int pos=-1){return -1;};
 
-
-  /**
-     removes the detector in position pos from the multidetector
-     \param pos position of the detector to be removed from the multidetector system (defaults to -1 i.e. last detector)
-     \returns the actual number of detectors or -1 if it failed (always for slsDetector)
-  */
-  virtual int removeSlsDetector(int pos=-1){return -1;};
-
-  /**removes the detector in position pos from the multidetector
-     \param name is the name of the detector
-     \returns the actual number of detectors or -1 if it failed  (always for slsDetector)
-  */
-  virtual int removeSlsDetector(char* name){return -1;};
 
   /** 
       Turns off the server -  do not use except for debugging!
@@ -407,7 +429,7 @@ class slsDetectorUtils :  public slsDetectorActions, public postProcessing {
      \fname file name to load data from
      \returns OK or FAIL
   */
-  virtual int loadImageToDetector(imageType index,string const fname)=0;
+  virtual int loadImageToDetector(imageType index,std::string const fname)=0;
   
 
   /**
@@ -416,7 +438,7 @@ class slsDetectorUtils :  public slsDetectorActions, public postProcessing {
      \fname file fname to load data from
      \returns OK or FAIL
   */
-  virtual int writeCounterBlockFile(string const fname,int startACQ=0)=0;
+  virtual int writeCounterBlockFile(std::string const fname,int startACQ=0)=0;
 
 
   /**
@@ -453,6 +475,13 @@ class slsDetectorUtils :  public slsDetectorActions, public postProcessing {
   */
 
   int acquire(int delflag=1);
+
+  /**
+   * Give an internal software trigger to the detector (Eiger only)
+   * @return OK or FAIL
+   */
+  virtual int sendSoftwareTrigger()=0;
+
 
 
   //  double* convertAngles(){return convertAngles(currentPosition);};
@@ -546,7 +575,7 @@ class slsDetectorUtils :  public slsDetectorActions, public postProcessing {
   /**
      Returns the IP of the last client connecting to the detector
   */
-  virtual string getLastClientIP()=0;
+  virtual std::string getLastClientIP()=0;
 
 
 
@@ -563,13 +592,13 @@ class slsDetectorUtils :  public slsDetectorActions, public postProcessing {
       \param imod module number, -1 means all modules
       \returns OK or FAIL
   */
-  virtual int loadSettingsFile(string fname, int imod=-1)=0;
+  virtual int loadSettingsFile(std::string fname, int imod=-1)=0;
 
   /** programs FPGA with pof file
       \param fname file name
       \returns OK or FAIL
   */
-  virtual int programFPGA(string fname)=0;
+  virtual int programFPGA(std::string fname)=0;
 
   /** resets FPGA
       \returns OK or FAIL
@@ -593,7 +622,7 @@ class slsDetectorUtils :  public slsDetectorActions, public postProcessing {
       \param imod module number, -1 means all modules
       \returns OK or FAIL
   */
-  virtual int saveSettingsFile(string fname, int imod=-1)=0;
+  virtual int saveSettingsFile(std::string fname, int imod=-1)=0;
 
   /** sets all the trimbits to a particular value
       \param val trimbit value
@@ -663,7 +692,7 @@ class slsDetectorUtils :  public slsDetectorActions, public postProcessing {
      \param fname file name
      \returns OK or FAIL
   */
-  virtual int writeConfigurationFile(string const fname)=0;
+  virtual int writeConfigurationFile(std::string const fname)=0;
 
 
   void registerGetPositionCallback( double (*func)(void*),void *arg){get_position=func; POarg=arg;};
@@ -687,7 +716,7 @@ class slsDetectorUtils :  public slsDetectorActions, public postProcessing {
       \returns OK or FAIL
   
   */
-  int dumpDetectorSetup(string const fname, int level=0);  
+  int dumpDetectorSetup(std::string const fname, int level=0);  
 
 
   /** 
@@ -697,7 +726,7 @@ class slsDetectorUtils :  public slsDetectorActions, public postProcessing {
       \returns OK or FAIL
   
   */
-  int retrieveDetectorSetup(string const fname, int level=0);
+  int retrieveDetectorSetup(std::string const fname, int level=0);
 
   static int dummyAcquisitionFinished(double prog,int status,void* p){cout <<"Acquisition finished callback! " << prog << " " << status << endl; return 0;}
   static int dummyMeasurementFinished(int im,int findex,void* p){cout <<"Measurement finished callback! " << im << " " << findex << endl; return 0;}
@@ -711,12 +740,12 @@ class slsDetectorUtils :  public slsDetectorActions, public postProcessing {
   /**
      Checks if the receiver is really online
   */
-  virtual string checkReceiverOnline()=0;
+  virtual std::string checkReceiverOnline()=0;
 
   /**
      Returns the IP of the last client connecting to the receiver
   */
-  virtual string getReceiverLastClientIP()=0;
+  virtual std::string getReceiverLastClientIP()=0;
 
 
   /**
@@ -724,14 +753,35 @@ class slsDetectorUtils :  public slsDetectorActions, public postProcessing {
      @param fileName fileDir file directory
      \returns file dir
   */
-  virtual string setFilePath(string s="")=0;
+  virtual std::string setFilePath(std::string s="")=0;
 
   /**
      Sets up the file name
      @param fileName file name
      \returns file name
   */
-  virtual string setFileName(string s="")=0;
+  virtual std::string setFileName(std::string s="")=0;
+
+  /**
+     Sets the max frames per file in receiver
+     @param f max frames per file
+     \returns max frames per file in receiver
+  */
+  virtual int setReceiverFramesPerFile(int f = -1) = 0;
+
+  /**
+     Sets the frames discard policy in receiver
+     @param f frames discard policy
+     \returns frames discard policy set in receiver
+  */
+  virtual frameDiscardPolicy setReceiverFramesDiscardPolicy(frameDiscardPolicy f = GET_FRAME_DISCARD_POLICY) = 0;
+
+  /**
+     Sets the partial frames padding enable in receiver
+     @param f partial frames padding enable
+     \returns partial frames padding enable in receiver
+  */
+  virtual int setReceiverPartialFramesPadding(int f = -1) = 0;
 
   /**
      Sets up the file format
@@ -743,12 +793,12 @@ class slsDetectorUtils :  public slsDetectorActions, public postProcessing {
   /**
      \returns file dir
   */
-  virtual string getFilePath()=0;
+  virtual std::string getFilePath()=0;
 
   /**
      \returns file name
   */
-  virtual string getFileName()=0;
+  virtual std::string getFileName()=0;
 
   /**
      \returns file name
@@ -819,16 +869,18 @@ virtual int calibratePedestal(int frames = 0)=0;
     set roi
      \param n number of rois
      \param roiLimits array of roi
+     \param imod module number (-1 for all)
      \returns success or failure
 */
-virtual int setROI(int n=-1,ROI roiLimits[]=NULL)=0;
+virtual int setROI(int n=-1,ROI roiLimits[]=NULL, int imod = -1)=0;
 
 /**
  	get roi from each detector and convert it to the multi detector scale
  	\param n number of rois
- 	\returns an array of multidetector's rois
+ 	\param imod module number (-1 for all)
+ 	\returns pointer to array of ROI structure
 */
-virtual ROI* getROI(int &n)=0;
+virtual ROI* getROI(int &n, int imod = -1)=0;
 
 /** Sets the read receiver frequency
  	  if data required from receiver randomly readRxrFrequency=0,
@@ -882,7 +934,7 @@ virtual int setReceiverSilentMode(int i = -1)=0;
       @param fname pattern file to open
       @returns OK/FAIL
   */
-  virtual int setCTBPattern(string fname)=0;
+  virtual int setCTBPattern(std::string fname)=0;
 
   
   /** Writes a pattern word to the CTB
@@ -961,6 +1013,14 @@ virtual int setReceiverSilentMode(int i = -1)=0;
   virtual bool isAcquireReady() = 0;
 
 
+  /**
+   * Check version compatibility with detector/receiver software
+   * (if hostname/rx_hostname has been set/ sockets created)
+   * \param p port type control port or data (receiver) port
+   * \returns FAIL for incompatibility, OK for compatibility
+   */
+  virtual int checkVersionCompatibility(portType t) = 0;
+
  protected:
 
 
@@ -992,7 +1052,10 @@ virtual int setReceiverSilentMode(int i = -1)=0;
   int (*progress_call)(double,void*);
   void *pProgressCallArg;
   
+  /** semaphore to let postprocessing thread continue for next scan/measurement */
   sem_t sem_newRTAcquisition;
+  /** semaphore to let main thread know it got all the dummy packets (also from ext. process) */
+  sem_t sem_endRTAcquisition;
 
 
 };

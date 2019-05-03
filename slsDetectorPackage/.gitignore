@@ -1,0 +1,10 @@
+.cproject
+.project
+.settings
+*.aux
+*.log
+*.out
+*.toc
+build
+docs/
+RELEASE.txt

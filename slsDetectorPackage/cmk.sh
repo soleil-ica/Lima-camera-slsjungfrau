@@ -6,6 +6,7 @@ COMPILERTHREADS=0
 TEXTCLIENT=0
 RECEIVER=0
 GUI=0
+DEBUG=0
 
 
 CLEAN=0
@@ -24,6 +25,7 @@ Usage: $0 [-c] [-b] [-h] [-d <HDF5 directory>] [-j]
  -r: Build/Rebuilds only receiver
  -g: Build/Rebuilds only gui
  -j: Number of threads to compile through
+ -e: Debug mode
  
 For only make:
 ./cmk.sh
@@ -53,7 +55,7 @@ For rebuilding only certain sections
  
  " ; exit 1; }
 
-while getopts ":bchd:j:trg" opt ; do
+while getopts ":bchd:j:trge" opt ; do
 	case $opt in
 	b) 
 		echo "Building of CMake files Required"
@@ -90,7 +92,11 @@ while getopts ":bchd:j:trg" opt ; do
 		echo "Compiling Options: GUI" 
 		GUI=1
 		REBUILD=1
-		;;      
+		;;  
+	e)
+		echo "Compiling Options: Debug" 
+		DEBUG=1
+		;;    
     \?)
      	echo "Invalid option: -$OPTARG" 
 		usage
@@ -110,20 +116,20 @@ done
 
 
 if [ $TEXTCLIENT -eq 0 ] && [ $RECEIVER -eq 0 ]  && [ $GUI -eq 0 ]; then
-       CMAKE_POST+=" -DUSE_TEXTCLIENT=ON -DUSE_RECEIVER=ON -DUSE_GUI=ON "
+       CMAKE_POST+=" -DSLS_USE_TEXTCLIENT=ON -DSLS_USE_RECEIVER=ON -DSLS_USE_GUI=ON "
        echo "Compile Option: TextClient, Receiver and GUI"
 else 
        if [ $TEXTCLIENT -eq 1 ]; then
-              CMAKE_POST+=" -DUSE_TEXTCLIENT=ON "
+              CMAKE_POST+=" -DSLS_USE_TEXTCLIENT=ON "
                echo "Compile Option: TextClient"
        fi
        if [ $RECEIVER -eq 1 ]; then
-               CMAKE_POST+=" -DUSE_RECEIVER=ON "
+               CMAKE_POST+=" -DSLS_USE_RECEIVER=ON "
                echo "Compile Option: Receiver"
        fi
                                
        if [ $GUI -eq 1 ]; then
-               CMAKE_POST+=" -DUSE_GUI=ON "
+               CMAKE_POST+=" -DSLS_USE_GUI=ON "
                echo "Compile Option: GUI"
        fi
 fi
@@ -145,15 +151,20 @@ else
 	fi
 fi
 
-CMAKE_POST+=" -DCMAKE_BUILD_TYPE=Debug "
+#Debug
+if [ $DEBUG -eq 1 ]; then
+	CMAKE_POST+=" -DCMAKE_BUILD_TYPE=Debug "
+	echo "Debug Option enabled"
+fi 
+
 
 #hdf5 rebuild
 if [ $HDF5 -eq 1 ]; then
 	CMAKE_PRE+="HDF5_ROOT="$HDF5DIR
-	CMAKE_POST+=" -DUSE_HDF5=ON "
+	CMAKE_POST+=" -DSLS_USE_HDF5=ON "
 #normal mode rebuild
 else
-	CMAKE_POST+=" -DUSE_HDF5=OFF "
+	CMAKE_POST+=" -DSLS_USE_HDF5=OFF "
 fi
 
 

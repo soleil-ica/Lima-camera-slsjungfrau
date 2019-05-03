@@ -1,6 +1,6 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
 
-<!--Converted with LaTeX2HTML 2008 (1.71)
+<!--Converted with LaTeX2HTML 2012 (1.2)
 original version by:  Nikos Drakos, CBLU, University of Leeds
 * revised and updated by:  Marcus Hennecke, Ross Moore, Herb Swan
 * with significant contributions from:
@@ -13,7 +13,7 @@ original version by:  Nikos Drakos, CBLU, University of Leeds
 <META NAME="resource-type" CONTENT="document">
 <META NAME="distribution" CONTENT="global">
 
-<META NAME="Generator" CONTENT="LaTeX2HTML v2008">
+<META NAME="Generator" CONTENT="LaTeX2HTML v2012">
 <META HTTP-EQUIV="Content-Style-Type" CONTENT="text/css">
 
 <LINK REL="STYLESHEET" HREF="slsDetectorInstall.css">
@@ -25,11 +25,11 @@ original version by:  Nikos Drakos, CBLU, University of Leeds
 <H3><A NAME="SECTION00054100000000000000">
 JUNGFRAU Firmware</A>
 </H3>
-<I>For SLS Detector Package v3.1.0</I> 
+<I>For SLS Detector Package v4.0.0</I> 
 <BR>
-Minimum compatible version: 13.11.2017 
+Minimum compatible version: 15.06.2018 
 <BR>
-Latest version: 13.11.2017 
+Latest version: 15.06.2018 
 <BR>
 <P>
 At times, one has to update the firmware, which then also requires updating the
@@ -50,7 +50,7 @@ Detector Group.
 <LI>Update the on-board software as per the instructions in the next
 section.
 </LI>
-<LI>Start the on-board server in debug mode:
+<LI>Start the on-board server in update mode:
   
 <OL>
 <LI>Connect to the blackfin on the detector
@@ -66,13 +66,13 @@ section.
 </LI>
 <LI>Reboot blackfin using <code>reboot</code>
 </LI>
-<LI>Run <code>ps</code> to ensure no gotthardDetectorServers are running
+<LI>Run <code>ps</code> to ensure no jungfrauDetectorServers are running
     
 </LI>
 </OL>
 </LI>
-<LI>Start the server in debug mode using: 
-<BR><code>./jungfrauDetectorServerxxx -debug</code> 
+<LI>Start the server in update mode using: 
+<BR><code>./jungfrauDetectorServerxxx -update</code> 
 <BR>
 Leave this console on to come back to it later.
   
@@ -94,7 +94,7 @@ script in <code>slsDetectorPackage/cleansharedmemory.sh</code>
 <LI>Once the programming is done:
   
 <OL>
-<LI>Switch to the console that has the debug server running and kill it
+<LI>Switch to the console that has the update server running and kill it
 using Ctrl+C and ensure no jungfrauDetectorServers are
 running
 </LI>

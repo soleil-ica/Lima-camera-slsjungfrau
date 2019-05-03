@@ -42,19 +42,19 @@
 #define TOKEN_RESTART_DELAY		0x88000000
 #define TOKEN_RESTART_DELAY_ROI         0x1b000000
 #define TOKEN_TIMING_REV1               0x1f16
-#define TOKEN_TIMING_REV2               0x1f0f
+#define TOKEN_TIMING_REV2               0x1f10
 
 #define DEFAULT_PHASE_SHIFT			120
 #define DEFAULT_IP_PACKETSIZE		0x0522
 #define DEFAULT_UDP_PACKETSIZE		0x050E
-#define ADC1_IP_PACKETSIZE			256*2+14+20
-#define ADC1_UDP_PACKETSIZE			256*2+4+8+2
+#define ADC1_IP_PACKETSIZE			(256*2+14+20)
+#define ADC1_UDP_PACKETSIZE			(256*2+4+8+2)
 
 #ifdef VIRTUAL
 #define DEBUGOUT
 #endif
 
-#define CLK_FREQ 32.1E+6
+#define CLK_FREQ 32.007729
 
 
 #endif

@@ -145,6 +145,15 @@ public:
 	/** Enable/Disable Histogram */
 	void SetHistogram(bool enable,int histArg, int min=0, int max=0, double size=0){histogram = enable;histogramArgument = histArg; histFrom=min;histTo=max;histSize=size;};
 
+	/** Get X Minimum value from plot */
+	double GetXMinimum() { if(plot_in_scope==1) return plot1D->GetXMinimum(); else return plot2D->GetPlot()->GetXMinimum();};
+	/** Get X Maximum value from plot */
+	double GetXMaximum() { if(plot_in_scope==1) return plot1D->GetXMaximum(); else return plot2D->GetPlot()->GetXMaximum();};
+	/** Get Y Minimum value from plot */
+	double GetYMinimum() { if(plot_in_scope==1) return plot1D->GetYMinimum(); else return plot2D->GetPlot()->GetYMinimum();};
+	/** Get Y Maximum value from plot */
+	double GetYMaximum() { if(plot_in_scope==1) return plot1D->GetYMaximum(); else return plot2D->GetPlot()->GetYMaximum();};
+
 public slots:
 /** To select 1D or 2D plot
  @param i is 1 for 1D, else 2D plot */
@@ -286,8 +295,17 @@ void SetStyle(SlsQtH1D*  h){
 void GetStatistics(double &min, double &max, double &sum, double* array, int size);
 
 
-
-
+/**
+ * Convert data from char* to double based on bit mode (get gain data from plot if enabled for jungfrau
+ * @param dest destination double array
+ * @param source source char array
+ * @param size number of pixels
+ * @param databytes number of data bytes
+ * @param dr dynamic range
+ * @param gaindest NULL if not required, points to a double array to be filled up if gain data enabled
+ *
+ */
+void toDoublePixelData(double* dest, char* source,int size, int databytes, int dr, double* gaindest = NULL);
 
 private slots:
 /** To update plot
@@ -313,6 +331,11 @@ void ShowSaveErrorMessage(QString fileName);
  * @param status is the status of the detector
  * */
 void ShowAcquisitionErrorMessage(QString status);
+/**
+ * Enable Gain Plot
+ * @param e true for enable, false for disable
+ */
+void EnableGainPlot(bool e);
 
 
 private:
@@ -347,7 +370,6 @@ SlsQt1DPlot* 		plot1D;
 SlsQt2DPlotLayout* 	plot2D;
 /**	vector of 1D hist values */
 QVector<SlsQtH1D*> 	plot1D_hists;
-
 
 /**label with frame index for those with many frames per file*/
 QLabel *histFrameIndexTitle;
@@ -571,7 +593,17 @@ QVector<QwtIntervalSample> histogramSamples;
 bool plotRequired;
 
 
+/**	2D object second plot  */
+SlsQt2DPlotLayout* 	gainplot2D;
+/**	Current Image Values in 2D gain plot */
+double* gainImageArray;
+/** gain plot enable, enabled if gain data has been extracted and is available */
+bool gainPlotEnable;
+/** gain data enable, enabled if gain data to be extracted from normal data */
+bool gainDataEnable;
 
+const static int npixelsx_jctb = 400;
+int npixelsy_jctb;
 
 signals:
 void UpdatingPlotFinished();
@@ -579,13 +611,12 @@ void InterpolateSignal(bool);
 void ContourSignal(bool);
 void LogzSignal(bool);
 void LogySignal(bool);
-void SetZRangeSignal(double,double);
 void ResetZMinZMaxSignal(bool,bool,double,double);
 void SetCurrentMeasurementSignal(int);
 void saveErrorSignal(QString);
 void AcquisitionErrorSignal(QString);
 void UpdatePlotSignal();
-void AcquisitionFinishedSignal();
+void GainPlotSignal(bool);
 };
 
 

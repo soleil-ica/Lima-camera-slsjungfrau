@@ -69,10 +69,15 @@ namespace lima
             //==================================================================
             // add a new received frame
             void addReceived(const int           in_receiver_index,
-                             const CameraFrame & in_frame         );
+                             const CameraFrame & in_frame         ,
+                             const char *        in_data_pointer  = NULL,
+                             const uint32_t      in_data_size     = 0   );
 
-            // get the first complete frame from complete frames container
-            bool getFirstComplete(CameraFrame & out_frame);
+            // tell if there is an available complete frame in the complete frames container
+            bool completeAvailable(void);
+
+            // get a reference to the first complete frame from complete frames container
+            const CameraFrame & getFirstComplete(void);
 
             // move the first complete frame to the treated frame container
             void moveFirstCompleteToTreated();

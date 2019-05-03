@@ -1,6 +1,6 @@
-#define GITURL "git@github.com:slsdetectorgroup/slsDetectorPackage.git"
-#define GITREPUUID "e599bfe56f512ea6a262483f61ffd8d67d6c6fcd"
-#define GITAUTH "Dhanya_Thattil"
-#define GITREV 0x3475
-#define GITDATE 0x20180628
-#define GITBRANCH "3.1.3"
+#define GITURL "git@github.com:soleil-ica/Lima-camera-slsjungfrau.git"
+#define GITREPUUID "8ddd3efb8a87d71c9103f4c6ce2576cab4289b7f"
+#define GITAUTH "Arafat_Noureddine"
+#define GITREV 0x28
+#define GITDATE 0x20190221
+#define GITBRANCH "sdk-4-0-0-update"

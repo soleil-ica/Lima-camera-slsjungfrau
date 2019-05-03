@@ -148,6 +148,7 @@ void qTabDeveloper::SetupWidgetWindow() {
 
 
 	case slsDetectorDefs::JUNGFRAU:
+	case slsDetectorDefs::JUNGFRAUCTB:
 		NUM_DAC_WIDGETS = 8;
 		NUM_ADC_WIDGETS = 1;
 		dacNames.push_back("v vb comp:");
@@ -471,6 +472,8 @@ slsDetectorDefs::dacIndex qTabDeveloper::getSLSIndex(int index){
 					}
 					break;
 					case slsDetectorDefs::JUNGFRAU:
+					case slsDetectorDefs::JUNGFRAUCTB:
+
 						switch(index){
 						case 0:
 						case 1:
@@ -524,7 +527,7 @@ void qTabDeveloper::RefreshAdcs(){
 			if(value == -1)
 				spinAdcs[i]->setText(QString("Different values"));
 			else {
-				if(detType == slsDetectorDefs::EIGER || detType == slsDetectorDefs::JUNGFRAU)
+				if(detType == slsDetectorDefs::EIGER || detType == slsDetectorDefs::JUNGFRAU || detType == slsDetectorDefs::JUNGFRAUCTB)
 					value/=1000.00;
 				spinAdcs[i]->setText(QString::number(value,'f',2)+0x00b0+QString("C"));
 			}
@@ -533,7 +536,7 @@ void qTabDeveloper::RefreshAdcs(){
 		else{
 			double value = (double)det->getADC(getSLSIndex(i+NUM_DAC_WIDGETS));
 
-			if(detType == slsDetectorDefs::EIGER || detType == slsDetectorDefs::JUNGFRAU)
+			if(detType == slsDetectorDefs::EIGER || detType == slsDetectorDefs::JUNGFRAU || detType == slsDetectorDefs::JUNGFRAUCTB)
 				value/=1000.00;
 			spinAdcs[i]->setText(QString::number(value,'f',2)+0x00b0+QString("C"));
 		}

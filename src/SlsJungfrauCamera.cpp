@@ -40,6 +40,8 @@ using namespace lima;
 using namespace lima::SlsJungfrau;
 
 #include <cmath>
+#include <iostream>
+#include <fstream>
 
 /************************************************************************
  * \brief constructor
@@ -47,11 +49,17 @@ using namespace lima::SlsJungfrau;
  * \param in_readout_time_sec readout time in seconds
  * \param in_receiver_fifo_depth Number of frames in the receiver memory
  * \param in_frame_packet_number Number of packets we should get in each receiver frame
+ * \param in_gains_coeffs_file_name complete path of the gains coefficients file
+ * \param in_pedestal_file_names complete path of the pedestal images
+ * \param in_pedestal_nb_frames number of frames used to generate the pedestal images
  ************************************************************************/
-Camera::Camera(const std::string & in_config_file_name   ,
-               const double        in_readout_time_sec   ,
-               const long          in_receiver_fifo_depth,
-               const long          in_frame_packet_number) : m_thread(*this), m_frames_manager(*this)
+Camera::Camera(const std::string &            in_config_file_name      ,
+               const double                   in_readout_time_sec      ,
+               const long                     in_receiver_fifo_depth   ,
+               const long                     in_frame_packet_number   ,
+               const std::string &            in_gains_coeffs_file_name,
+               const std::vector<std::string> in_pedestal_file_names   ,
+               const std::vector<long>        in_pedestal_nb_frames    ) : m_frames_manager(*this)
 {
     DEB_CONSTRUCTOR();
 
@@ -68,10 +76,17 @@ Camera::Camera(const std::string & in_config_file_name   ,
     m_threshold_energy_eV = 0.0;
     m_status              = Camera::Idle; // important for the calls of updateTimes & updateTriggerData in the init method.
     m_clock_divider       = Camera::FullSpeed;
+    m_gain_mode           = Camera::undefined;
 
     m_readout_time_sec    = in_readout_time_sec   ;
     m_receiver_fifo_depth = in_receiver_fifo_depth;
     m_frame_packet_number = static_cast<uint32_t>(in_frame_packet_number);
+ 
+    m_gains_coeffs_file_name = in_gains_coeffs_file_name;
+    m_pedestal_file_names    = in_pedestal_file_names;
+    m_pedestal_nb_frames     = in_pedestal_nb_frames;  
+    m_calibration_running    = false;
+    m_dark_images_loaded     = false;
 
     m_detector_type             = "undefined";
     m_detector_model            = "undefined";
@@ -80,6 +95,18 @@ Camera::Camera(const std::string & in_config_file_name   ,
     m_module_firmware_version   = "undefined";
 
     init(in_config_file_name);
+
+    // creating the camera thread
+    m_thread = new CameraThread(*this);
+
+    // starting the acquisition thread
+    m_thread->start();
+
+    // creating the camera calibration thread
+    m_dark_thread = new CameraDarkThread(*this);
+
+    // starting the acquisition thread
+    m_dark_thread->start();
 }
 
 /************************************************************************
@@ -89,8 +116,17 @@ Camera::~Camera()
 {
     DEB_DESTRUCTOR();
 
-    // stopping the acquisition
-    stopAcq();
+    // stopping the acquisition and aborting the thread
+    applyStopAcq(false, true);
+
+    // releasing the camera thread
+    delete m_thread;
+
+    // stopping the calibration and aborting the thread
+    applyStopCalibration(false, true);
+
+    // releasing the camera thread
+    delete m_dark_thread;
 
     // releasing the detector control instance
     DEB_TRACE() << "Camera::Camera - releasing the detector control instance";
@@ -142,13 +178,22 @@ void Camera::init(const std::string & in_config_file_name)
     // creating the detector control instance
     int id = 0;
 
-    m_detector_control = new slsDetectorUsers(id);
+    m_detector_control = new slsDetectorUsers(result, id);
+
+    if(result == slsDetectorDefs::FAIL)
+    {
+        THROW_HW_FATAL(ErrorType::Error) << "slsDetectorUsers constructor failed! Could not initialize the camera!";
+    }
 
     // configuration file is used to properly configure advanced settings in the shared memory
     result = m_detector_control->readConfigurationFile(m_config_file_name);
 
     if(result == slsDetectorDefs::FAIL)
     {
+        // cleaning the shared memory because sometimes it can be corrupted
+        // It could help when the device will be restarted.
+        cleanSharedMemory();
+
         THROW_HW_FATAL(ErrorType::Error) << "readConfigurationFile failed! Could not initialize the camera!";
     }
 
@@ -184,13 +229,7 @@ void Camera::init(const std::string & in_config_file_name)
     m_detector_control->enableWriteToFile(slsDetectorDefs::DISABLED);
 
     // setting the receiver fifo depth (number of frames in the receiver memory)
-    // in a next sdk release, we could have a method to call.
-    // At the moment, we should use the put command.
-    {
-        std::stringstream tempStream;
-        tempStream << "rx_fifodepth " << m_receiver_fifo_depth;
-        setCmd(tempStream.str());
-    }
+    m_detector_control->setReceiverFifoDepth(m_receiver_fifo_depth);
 
     // initing the internal copies of exposure & latency times
     updateTimes();
@@ -205,13 +244,41 @@ void Camera::init(const std::string & in_config_file_name)
     m_detector_firmware_version = convertVersionToString(m_detector_control->getDetectorFirmwareVersion());
     m_detector_software_version = convertVersionToString(m_detector_control->getDetectorSoftwareVersion());
 
-    // starting the acquisition thread
-    m_thread.start();
-
     // logging some versions informations
     DEB_TRACE() << "Module   Firmware Version : " << getModuleFirmwareVersion  ();
     DEB_TRACE() << "Detector Firmware Version : " << getDetectorFirmwareVersion();
     DEB_TRACE() << "Detector Software Version : " << getDetectorSoftwareVersion();
+
+    // loading the gains'coefficients file
+    loadGainsCoeffsFile(m_gains_coeffs_file_name, m_gains_coeffs, m_width, m_height);
+
+    // loading the dark images files
+    if(m_pedestal_file_names.size() == SLS_NUMBER_OF_DARK_IMAGES)
+    {
+        std::size_t nb_darks;
+
+        for(nb_darks = 0 ; nb_darks < m_pedestal_file_names.size() ; nb_darks++)
+        {
+            if(!loadDarkImageFile(m_pedestal_file_names[nb_darks], m_pedestal_images, m_width, m_height))
+            {
+                break;
+            }
+        }
+
+        // no problem occured
+        if(nb_darks == m_pedestal_file_names.size())
+        {
+            m_dark_images_loaded = true;
+        }
+        else
+        // a problem occured, we flush the dark images which could have been loaded
+        {
+            m_pedestal_images.clear();
+        }
+    }
+
+    // build the intensity coeffs buffer
+    updateIntensityCoeffs();
 }
 
 /************************************************************************
@@ -221,9 +288,7 @@ void Camera::cleanSharedMemory()
 {
     DEB_MEMBER_FUNCT();
 
-    std::string cmd = "ipcs -m | grep -E '^0x000016[0-9a-z]{2}' | "
-                      "awk '{print $2}' | while read m; do ipcrm -m $m; done";
-
+    std::string cmd = "rm /dev/shm/slsDetectorPackage*;";
     std::system(cmd.c_str());
 }
 
@@ -236,9 +301,41 @@ lima::AutoMutex Camera::sdkLock() const
     return lima::AutoMutex(m_sdk_cond.mutex());
 }
 
+/************************************************************************
+ * \brief creates an autolock mutex for calibration data access
+ ************************************************************************/
+lima::AutoMutex Camera::calibrationLock() const
+{
+    DEB_MEMBER_FUNCT();
+    return lima::AutoMutex(m_calibration_cond.mutex());
+}
+
 //==================================================================
 // Related to HwInterface
 //==================================================================
+//------------------------------------------------------------------
+// calibration management
+//------------------------------------------------------------------
+/*******************************************************************
+ * \brief starts the calibration
+ *******************************************************************/
+void Camera::startCalibration()
+{
+    stopCalibration();
+
+    m_dark_thread->sendCmd(CameraDarkThread::StartCalibration);
+    m_dark_thread->waitNotStatus(CameraDarkThread::Idle);
+}
+
+/*******************************************************************
+ * \brief stops the calibration
+ *******************************************************************/
+void Camera::stopCalibration()
+{
+    // stopping the thread and restarting the thread in case of error
+    applyStopCalibration(true, false);
+}
+
 //------------------------------------------------------------------
 // acquisition management
 //------------------------------------------------------------------
@@ -257,12 +354,8 @@ void Camera::prepareAcq()
             THROW_HW_ERROR(ErrorType::Error) << "Start mode is not allowed for this device! Please use Snap mode.";
     }
 
-
     // reset the number of caught frames in the sdk
-    // in the next sdk release, we will use the method int resetFramesCaughtInReceiver().
-    // At the moment, we should use the put command.
-    // the given value 0 is just because put requires an argument, so it can be anything.
-    setCmd("resetframescaught 0");
+    m_detector_control->resetFramesCaughtInReceiver();
 
     // clear the frames containers
     m_frames_manager.clear();
@@ -273,10 +366,10 @@ void Camera::prepareAcq()
  *******************************************************************/
 void Camera::startAcq()
 {
-    DEB_MEMBER_FUNCT();
+    stopAcq();
 
-    m_thread.sendCmd(CameraThread::StartAcq);
-    m_thread.waitNotStatus(CameraThread::Idle);
+    m_thread->sendCmd(CameraThread::StartAcq);
+    m_thread->waitNotStatus(CameraThread::Idle);
 }
 
 /*******************************************************************
@@ -284,23 +377,87 @@ void Camera::startAcq()
  *******************************************************************/
 void Camera::stopAcq()
 {
+    // stopping the thread and restarting the thread in case of error
+    applyStopAcq(true, false);
+}
+
+/*******************************************************************
+ * \brief stops the acquisition and abort or restart the acq thread 
+ *        if it is in error. Can also abort the thread when we exit
+ *        the program.
+ *******************************************************************/
+void Camera::applyStopAcq(bool in_restart, bool in_always_abort)
+{
     DEB_MEMBER_FUNCT();
 
 	DEB_TRACE() << "executing StopAcq command...";
 
-    if(m_thread.getStatus() != CameraThread::Error)
-    {
-        m_thread.execStopAcq();
-
-        // Waiting for thread to finish or to be in error
-        m_thread.waitNotStatus(CameraThread::Running);
-    }
+    m_thread->execStopAcq();
 
     // thread in error
-    if(m_thread.getStatus() == CameraThread::Error)
+    if(m_thread->getStatus() == CameraThread::Error)
     {
-        // aborting & restart the thread
-        m_thread.abort();
+        // aborting the thread
+        m_thread->abort();
+
+        if(in_restart)
+        {
+            // releasing the camera thread
+            delete m_thread;
+
+            // creating the camera thread
+            m_thread = new CameraThread(*this);
+
+            // starting the acquisition thread
+            m_thread->start();
+        }
+    }
+    else
+    // we are going to exit the program, so we are forcing an abort
+    if(in_always_abort)
+    {
+        // aborting the thread
+        m_thread->abort();
+    }
+}
+
+/*******************************************************************
+ * \brief stops the calibration and abort or restart the thread 
+ *        if it is in error. Can also abort the thread when we exit
+ *        the program.
+ *******************************************************************/
+void Camera::applyStopCalibration(bool in_restart, bool in_always_abort)
+{
+    DEB_MEMBER_FUNCT();
+
+	DEB_TRACE() << "executing StopCalibration command...";
+
+    m_dark_thread->execStopCalibration();
+
+    // thread in error
+    if(m_dark_thread->getStatus() == CameraThread::Error)
+    {
+        // aborting the thread
+        m_dark_thread->abort();
+
+        if(in_restart)
+        {
+            // releasing the camera thread
+            delete m_dark_thread;
+
+            // creating the camera thread
+            m_dark_thread = new CameraDarkThread(*this);
+
+            // starting the thread
+            m_dark_thread->start();
+        }
+    }
+    else
+    // we are going to exit the program, so we are forcing an abort
+    if(in_always_abort)
+    {
+        // aborting the thread
+        m_dark_thread->abort();
     }
 }
 
@@ -324,18 +481,77 @@ void Camera::acquisitionDataReady(const int      in_receiver_index,
 
     // the start of this call is in a sls callback, so we should be as fast as possible
     // to avoid frames lost.
-    StdBufferCbMgr & buffer_mgr  = m_buffer_ctrl_obj.getBuffer();
-    lima::FrameDim   frame_dim   = buffer_mgr.getFrameDim();
-    int              mem_size    = frame_dim.getMemSize();
-
-    // checking the frame size
-    if(mem_size != in_data_size)
+    if(!m_calibration_running)
     {
-        DEB_TRACE() << "Incoherent sizes during frame copy process : " << 
-                       "sls size (" << in_data_size << ")" <<
-                       "lima size (" << mem_size << ")";
+        // 24 bits intensity images
+        if(areGainCoeffsLoaded())
+        {
+            m_frames_manager.manageFirstFrameTreatment(in_frame_index, in_timestamp);
+
+            uint64_t relative_frame_index = m_frames_manager.computeRelativeFrameIndex(in_frame_index);
+
+            // ckecking if there is no packet lost.
+            if(in_packet_number == m_frame_packet_number)
+            {
+                uint64_t relative_timestamp = m_frames_manager.computeRelativeTimestamp(in_timestamp);
+
+                // giving the frame to the frames manager
+                CameraFrame frame(relative_frame_index, in_packet_number, relative_timestamp);
+
+                // the image will be copied during the call of this method
+                m_frames_manager.addReceived(in_receiver_index, frame, in_data_pointer, in_data_size);
+            }
+            else
+            // rejected frame
+            {
+                DEB_TRACE() << "Rejected Frame [ " << relative_frame_index << ", " << in_packet_number << " ]";
+            }
+        }
+        // 16 bits raw images
+        else
+        {
+            StdBufferCbMgr & buffer_mgr  = m_buffer_ctrl_obj.getBuffer();
+            lima::FrameDim   frame_dim   = buffer_mgr.getFrameDim();
+
+            // checking the frame size 
+            int mem_size = frame_dim.getMemSize();
+
+            if(mem_size != in_data_size)
+            {
+                DEB_TRACE() << "Incoherent sizes during frame copy process : " << 
+                               "sls size (" << in_data_size << ")" <<
+                               "lima size (" << mem_size << ")";
+
+            }
+            else
+            {
+                m_frames_manager.manageFirstFrameTreatment(in_frame_index, in_timestamp);
+
+                uint64_t relative_frame_index = m_frames_manager.computeRelativeFrameIndex(in_frame_index);
+
+                // ckecking if there is no packet lost.
+                if(in_packet_number == m_frame_packet_number)
+                {
+                    uint64_t relative_timestamp = m_frames_manager.computeRelativeTimestamp (in_timestamp);
+
+                    // copying the frame
+                    char * dest_buffer = static_cast<char *>(buffer_mgr.getFrameBufferPtr(relative_frame_index));
+                    memcpy(dest_buffer, in_data_pointer, in_data_size);
+
+                    // giving the frame to the frames manager
+                    CameraFrame frame(relative_frame_index, in_packet_number, relative_timestamp);
+                    m_frames_manager.addReceived(in_receiver_index, frame);
+                }
+                else
+                // rejected frame
+                {
+                    DEB_TRACE() << "Rejected Frame [ " << relative_frame_index << ", " << in_packet_number << " ]";
+                }
+            }
+        }
     }
     else
+    // calibration is running)
     {
         m_frames_manager.manageFirstFrameTreatment(in_frame_index, in_timestamp);
 
@@ -344,15 +560,11 @@ void Camera::acquisitionDataReady(const int      in_receiver_index,
         // ckecking if there is no packet lost.
         if(in_packet_number == m_frame_packet_number)
         {
-            uint64_t relative_timestamp   = m_frames_manager.computeRelativeTimestamp (in_timestamp  );
-
-            // copying the frame
-            char * dest_buffer = static_cast<char *>(buffer_mgr.getFrameBufferPtr(relative_frame_index));
-            memcpy(dest_buffer, in_data_pointer, in_data_size);
-
             // giving the frame to the frames manager
-            CameraFrame frame(relative_frame_index, in_packet_number, relative_timestamp);
-            m_frames_manager.addReceived(in_receiver_index, frame);
+            CameraFrame frame(relative_frame_index, in_packet_number, 0); // does not need the timestamp
+
+            // the image will be copied during the call of this method
+            m_frames_manager.addReceived(in_receiver_index, frame, in_data_pointer, in_data_size);
         }
         else
         // rejected frame
@@ -499,11 +711,12 @@ Camera::Status Camera::getStatus()
 
     Camera::Status result;
 
-    int thread_status = m_thread.getStatus();
+    int thread_status      = m_thread->getStatus();
+    int dark_thread_status = m_dark_thread->getStatus();
 
-    // error during the acquisition management ?
+    // error during the acquisition management or calibration ?
     // the device becomes in error state.
-    if(thread_status == CameraThread::Error)
+    if((thread_status == CameraThread::Error)||(dark_thread_status == CameraDarkThread::Error))
     {
         result = Camera::Error;
     }
@@ -514,6 +727,12 @@ Camera::Status Camera::getStatus()
     if(thread_status == CameraThread::Running)
     {
         result = Camera::Running;
+    }
+    else
+    // the device is in calibration.
+    if(dark_thread_status == CameraDarkThread::Running)
+    {
+        result = Camera::Calibration;
     }
     else
     // the device is not in acquisition or in error, so we can read the hardware camera status
@@ -619,6 +838,16 @@ unsigned short Camera::getHeight() const
     return m_height;
 }
 
+/*******************************************************************
+ * \brief Gets the detector image size
+ * \param size returned detector image size
+ *******************************************************************/
+void Camera::getDetectorImageSize(Size& size)
+{
+	DEB_MEMBER_FUNCT();
+    size = Size(getWidth(), getHeight());
+}
+
 //------------------------------------------------------------------
 // current image type management
 //------------------------------------------------------------------
@@ -644,18 +873,39 @@ lima::ImageType Camera::getImageType() const
     // getting the bit depth of the camera
     int bit_depth = m_bit_depth;
 
+    // in the case of a gain coeffs file was loaded, the final image will be in 24 bits
+    if(areGainCoeffsLoaded())
+    {
+        bit_depth = 24;
+    }
+
     switch(bit_depth)
     {
         case 16: 
             type = lima::ImageType::Bpp16;
             break;
-        
+
+        case 24: 
+            type = lima::ImageType::Bpp24;
+            break;
+
         default:
             THROW_HW_ERROR(ErrorType::Error) << "This pixel format of the camera is not managed, only 16 bits cameras are managed!";
             break;
     }
 
     return type;
+}
+
+/*******************************************************************
+ * \brief gets the current image type
+ * \param type new image type
+*******************************************************************/
+void Camera::getImageType(ImageType& type) const
+{
+	DEB_MEMBER_FUNCT();
+
+    type = getImageType();
 }
 
 /*******************************************************************
@@ -671,9 +921,10 @@ void Camera::setImageType(lima::ImageType in_type)
     switch(in_type)
     {
         case lima::ImageType::Bpp16:
+        case lima::ImageType::Bpp24: 
             bit_depth = 16;
             break;
-        
+
         default:
             THROW_HW_ERROR(ErrorType::Error) << "This pixel format of the camera is not managed, only 16 bits cameras are managed!";
             break;
@@ -1283,9 +1534,10 @@ void Camera::releaseArgs(char * * & in_out_argv  ,
 /*******************************************************************
  * \brief Executes a set command
  * \param in_command command in command line format
+ * \param in_module_index module index
  * \return the command result
  *******************************************************************/
-std::string Camera::setCmd(const std::string & in_command)
+std::string Camera::setCmd(const std::string & in_command, int in_module_index)
 {
 	DEB_MEMBER_FUNCT();
     DEB_PARAM() << "Camera::setCmd - execute set command:\"" << in_command << "\"";
@@ -1301,7 +1553,7 @@ std::string Camera::setCmd(const std::string & in_command)
         // protecting the sdk concurrent access
         lima::AutoMutex sdk_mutex = sdkLock(); 
 
-        result = m_detector_control->putCommand(argc, argv);
+        result = m_detector_control->putCommand(argc, argv, in_module_index);
     }
 
     releaseArgs(argv, argc);
@@ -1313,9 +1565,10 @@ std::string Camera::setCmd(const std::string & in_command)
 /*******************************************************************
  * \brief Executes a get command
  * \param in_command command in command line format
+ * \param in_module_index module index
  * \return the command result
  *******************************************************************/
-std::string Camera::getCmd(const std::string & in_command)
+std::string Camera::getCmd(const std::string & in_command, int in_module_index)
 {
 	DEB_MEMBER_FUNCT();
     DEB_PARAM() << "Camera::getCmd - execute get command:\"" << in_command << "\"";
@@ -1331,7 +1584,7 @@ std::string Camera::getCmd(const std::string & in_command)
         // protecting the sdk concurrent access
         lima::AutoMutex sdk_mutex = sdkLock(); 
 
-        result = m_detector_control->getCommand(argc, argv);
+        result = m_detector_control->getCommand(argc, argv, in_module_index);
     }
 
     releaseArgs(argv, argc);
@@ -1481,6 +1734,719 @@ void Camera::setDelayAfterTrigger(double in_delay_after_trigger)
     lima::AutoMutex sdk_mutex = sdkLock(); 
 
     m_detector_control->setDelayAfterTrigger(in_delay_after_trigger, true); // in seconds
+}
+
+//------------------------------------------------------------------
+// gain mode management
+//------------------------------------------------------------------
+/*******************************************************************
+ * \brief Gets the gain mode
+ * \return gain mode
+ *******************************************************************/
+lima::SlsJungfrau::Camera::GainMode Camera::getGainMode(void)
+{
+    DEB_MEMBER_FUNCT();
+
+    // during acquisition, camera data access is not allowed because it
+    // could put the camera into an error state. 
+    // So we give the latest read value.
+    if(m_status == Camera::Idle)
+    {
+        slsDetectorDefs::detectorSettings gain_mode;
+
+        // protecting the sdk concurrent access
+        {
+            lima::AutoMutex sdk_mutex = sdkLock(); 
+
+            // getting the current gain mode index
+            gain_mode = static_cast<slsDetectorDefs::detectorSettings>(m_detector_control->setSettings(SLS_GET_VALUE));
+        }
+
+        // computing the gain mode
+        if((gain_mode == slsDetectorDefs::detectorSettings::UNDEFINED    ) ||
+           (gain_mode == slsDetectorDefs::detectorSettings::UNINITIALIZED))
+        {
+            m_gain_mode = Camera::undefined;
+        }
+        else
+        if(gain_mode == slsDetectorDefs::detectorSettings::DYNAMICGAIN)
+        {
+            m_gain_mode = Camera::dynamic;
+        }
+        else
+        if(gain_mode == slsDetectorDefs::detectorSettings::DYNAMICHG0)
+        {
+            m_gain_mode = Camera::dynamichg0;
+        }
+        else
+        if(gain_mode == slsDetectorDefs::detectorSettings::FIXGAIN1)
+        {
+            m_gain_mode = Camera::fixgain1;
+        }
+        else
+        if(gain_mode == slsDetectorDefs::detectorSettings::FIXGAIN2)
+        {
+            m_gain_mode = Camera::fixgain2;
+        }
+        else
+        if(gain_mode == slsDetectorDefs::detectorSettings::FORCESWITCHG1)
+        {
+            m_gain_mode = Camera::forceswitchg1;
+        }
+        else
+        if(gain_mode == slsDetectorDefs::detectorSettings::FORCESWITCHG2)
+        {
+            m_gain_mode = Camera::forceswitchg2;
+        }
+        else
+        {
+            THROW_HW_ERROR(ErrorType::Error) << "getGainMode : This camera gain mode is not managed: (" << gain_mode << ")";
+        }
+    }
+
+    return m_gain_mode;
+}
+
+/*******************************************************************
+ * \brief Sets the gain mode
+ * \param in_gain_mode needed gain mode 
+ *******************************************************************/
+void Camera::setGainMode(lima::SlsJungfrau::Camera::GainMode in_gain_mode)
+{
+    DEB_MEMBER_FUNCT();
+
+    // converting the detector gain mode to the sdk gain mode
+    slsDetectorDefs::detectorSettings gain_mode;
+
+    switch (in_gain_mode)
+    {       
+        case Camera::dynamic:
+            gain_mode = slsDetectorDefs::detectorSettings::DYNAMICGAIN;
+            break;
+
+        case Camera::dynamichg0:
+            gain_mode = slsDetectorDefs::detectorSettings::DYNAMICHG0;
+            break;
+
+        case Camera::fixgain1:
+            gain_mode = slsDetectorDefs::detectorSettings::FIXGAIN1;
+            break;
+
+        case Camera::fixgain2:
+            gain_mode = slsDetectorDefs::detectorSettings::FIXGAIN2;
+            break;
+
+        case Camera::forceswitchg1:
+            gain_mode = slsDetectorDefs::detectorSettings::FORCESWITCHG1;
+            break;
+
+        case Camera::forceswitchg2:
+            gain_mode = slsDetectorDefs::detectorSettings::FORCESWITCHG2;
+            break;
+
+        default:
+            THROW_HW_ERROR(ErrorType::Error) << "setGainMode : Cannot change the Trigger mode of the camera, this mode is not managed: (" << in_gain_mode << ")";
+            break;
+    }
+
+    // protecting the sdk concurrent access
+    {
+        lima::AutoMutex sdk_mutex = sdkLock(); 
+
+        // setting the current gain mode index and loading the settings to the detector
+        DEB_TRACE() << "setGainMode  " << gain_mode;
+
+        int result = m_detector_control->setSettings(static_cast<int>(gain_mode));
+
+        if(result == slsDetectorDefs::FAIL)
+        {
+            THROW_HW_ERROR(ErrorType::Error) << "setGainMode failed!";
+        }
+    }
+
+    // updating the internal data
+    getGainMode();
+}
+
+/*******************************************************************
+ * \brief Loads the gains'coefficients file
+ * \param in_file_name complete file name to load
+ * \param out_gains_coeffs container filled with the data
+ * \param in_width width of the detector image 
+ * \param in_height height of the detector image
+ * \return true if success, false if error
+ *******************************************************************/
+bool Camera::loadGainsCoeffsFile(const std::string & in_file_name,
+                                 std::vector<std::vector<double>> & out_gains_coeffs,
+                                 unsigned short in_width ,
+                                 unsigned short in_height)
+{
+    DEB_MEMBER_FUNCT();
+
+    double *    buffer = NULL;
+    bool        result = true;
+    std::size_t size   = 0LL ;
+
+    DEB_TRACE() << "opening Gains coefficients file " << in_file_name << "...";
+
+    std::ifstream file( in_file_name.c_str(), std::ios::in | std::ios::binary | std::ios::ate);
+
+    //File does not exist
+    if(file.fail())
+    {
+        result = false;
+    }
+    else
+    {
+        // copies all data into buffer
+        try
+        {
+            size = file.tellg();
+            file.seekg (0, std::ios::beg);
+            
+            buffer = new double [size / sizeof(double)];
+            file.read (reinterpret_cast<char *>(buffer), size);
+            file.close();
+
+            // compute the number of gains
+            // the file content is : G0, G1, G2,HG0
+            // we do not need HG0
+            int gain_size = in_width * in_height; 
+
+            // check the file size
+            if((size / sizeof(double)) == (gain_size * 4))
+            {
+                int nb_gains  = (size / (gain_size * sizeof(double))) - 1;
+
+                out_gains_coeffs.resize(nb_gains);
+
+                // allocate the vector
+                for(int gains_index = 0 ; gains_index < nb_gains ; gains_index++)
+                {
+                    std::vector<double> & gains_coeffs = out_gains_coeffs[gains_index];
+                    gains_coeffs.resize(gain_size);
+
+                    memcpy(&gains_coeffs[0], buffer + (gain_size * gains_index), gain_size * sizeof(double));
+                }
+            }
+            else
+            {
+                DEB_TRACE() << "Size is incoherent!";
+                DEB_TRACE() << "Found " << (size / sizeof(double)) << " elements.";
+                DEB_TRACE() << "Should be " << (gain_size * 4) << " elements.";
+                result = false;
+            }
+        }
+        catch(...)
+        {
+            result = false;
+        }
+    }
+
+    if(buffer != NULL)
+    {
+        delete [] buffer;
+    }
+
+    if(result)
+    {
+        DEB_TRACE() << "File loaded : " << size << " bytes.";
+    }
+    else
+    {
+        DEB_TRACE() << "error occured during opening.";
+    }
+
+    return result;
+}
+
+/*******************************************************************
+ * \brief tells if the gain coefficients were loaded
+ * \return true if the gain coefficients were loaded, else false
+ *******************************************************************/
+bool Camera::areGainCoeffsLoaded(void) const
+{
+    // protecting the concurrent access
+    lima::AutoMutex sdk_mutex = calibrationLock(); 
+
+    return !m_gains_coeffs.empty();
+}
+
+/*******************************************************************
+ * \brief Gets the gain coefficients state
+ * \return the state (loaded or not loaded)
+ *******************************************************************/
+std::string Camera::getGainCoeffsState(void)
+{
+    return (areGainCoeffsLoaded() ? SLS_GAIN_COEFFS_STATE_LOADED : SLS_GAIN_COEFFS_STATE_NOT_LOADED);
+}
+
+/*******************************************************************
+ * \brief Gets the coefficients for a gain type
+ * \param in_gain_index index of the gain (starts at 0)
+ * \param out_gain_coeffs buffer which will be filled with the values
+ * \return none
+ *******************************************************************/
+void Camera::getGainCoeffsState(int in_gain_index, double * out_gain_coeffs)
+{
+    // protecting the concurrent access
+    lima::AutoMutex sdk_mutex = calibrationLock(); 
+
+    if(in_gain_index < m_gains_coeffs.size())
+    {
+        memcpy(out_gain_coeffs, m_gains_coeffs[in_gain_index].data(), m_gains_coeffs[in_gain_index].size() * sizeof(double));
+    }
+    else
+    {
+        memset(out_gain_coeffs, 0, m_width * m_height * sizeof(double));
+    }
+}
+
+//==================================================================
+// Related to the calibration process
+//==================================================================
+/*******************************************************************
+ * \brief set the exposure time and period used for the calibration
+ * \param[in] in_pedestal_exposures_sec pedestal exposure time in seconds
+ * \param[in] in_pedestal_periods_sec pedestal period in seconds
+ *******************************************************************/
+void Camera::setCalibrationExposureTimeAndPeriod(double in_pedestal_exposures_sec, double in_pedestal_periods_sec)
+{
+    // protecting the concurrent access
+    lima::AutoMutex sdk_mutex = calibrationLock(); 
+
+    m_pedestal_exposures_sec.clear();
+    m_pedestal_periods_sec.clear  ();
+
+    for(std::size_t nb_darks = 0 ; nb_darks < m_pedestal_file_names.size() ; nb_darks++)
+    {
+        m_pedestal_exposures_sec.push_back(in_pedestal_exposures_sec);
+        m_pedestal_periods_sec.push_back  (in_pedestal_periods_sec  );
+    }
+}
+
+/*******************************************************************
+ * \brief Gets the calibration state
+ * \return the state
+ *******************************************************************/
+std::string Camera::getCalibrationState(void)
+{
+    std::string result = SLS_CALIBRATION_STATE_NONE;
+
+    // protecting the concurrent access
+    {
+        lima::AutoMutex sdk_mutex = calibrationLock(); 
+
+        if(m_dark_images_loaded)
+        {
+            result = SLS_CALIBRATION_STATE_LOADED;
+        }
+        else
+        {
+            Camera::Status status = getStatus();
+
+            if(status == Camera::Calibration)
+            {
+                std::size_t nb_dark_images = m_pedestal_images.size();
+
+                if(nb_dark_images == SLS_NUMBER_OF_DARK_IMAGES)
+                    result = SLS_CALIBRATION_STATE_GENERATED;
+                else
+                if(nb_dark_images == 0)
+                    result = SLS_CALIBRATION_STATE_RUNNING_0_3;
+                else
+                if(nb_dark_images == 1)
+                    result = SLS_CALIBRATION_STATE_RUNNING_1_3;
+                else
+                if(nb_dark_images == 2)
+                    result = SLS_CALIBRATION_STATE_RUNNING_2_3;
+            }
+        }
+    }
+
+    return result;
+}
+
+/*******************************************************************
+ * \brief Gets a dark image
+ * \param in_gain_index index of the gain (starts at 0)
+ * \param out_dark_image dark image which will be filled
+ * \return none
+ *******************************************************************/
+void Camera::getDarkImage(int in_gain_index, uint16_t * out_dark_image)
+{
+    // protecting the concurrent access
+    lima::AutoMutex sdk_mutex = calibrationLock(); 
+
+    if(in_gain_index < m_pedestal_images.size())
+    {
+        memcpy(out_dark_image, m_pedestal_images[in_gain_index].data(), m_pedestal_images[in_gain_index].size() * sizeof(uint16_t));
+    }
+    else
+    {
+        memset(out_dark_image, 0, m_width * m_height * sizeof(uint16_t));
+    }
+}
+
+/*******************************************************************
+ * \brief Loads a dark image from a file
+ * \param in_file_name complete file name to load
+ * \param out_pedestal_images container filled with the data
+ * \param in_width width of the detector image 
+ * \param in_height height of the detector image
+ * \return true if success, false if error
+ *******************************************************************/
+bool Camera::loadDarkImageFile(const std::string & in_file_name,
+                               std::vector<std::vector<uint16_t>> & out_pedestal_images,
+                               unsigned short in_width ,
+                               unsigned short in_height)
+{
+    DEB_MEMBER_FUNCT();
+
+    uint16_t *  buffer = NULL;
+    bool        result = true;
+    std::size_t size   = 0LL ;
+
+    DEB_TRACE() << "opening dark image file " << in_file_name << "...";
+
+    std::ifstream file( in_file_name.c_str(), std::ios::in | std::ios::binary | std::ios::ate);
+
+    //File does not exist
+    if(file.fail())
+    {
+        result = false;
+    }
+    else
+    {
+        // copies all data into buffer
+        try
+        {
+            size = file.tellg();
+            file.seekg (0, std::ios::beg);
+            
+            buffer = new uint16_t [size / sizeof(uint16_t)];
+            file.read (reinterpret_cast<char *>(buffer), size);
+            file.close();
+
+            int pixels_nb = in_width * in_height; 
+
+            // check the file size
+            if((size / sizeof(uint16_t)) == pixels_nb)
+            {
+                out_pedestal_images.resize(out_pedestal_images.size() + 1);
+                std::vector<uint16_t> & pedestal_image = out_pedestal_images.back();
+                pedestal_image.resize(pixels_nb);
+
+                memcpy(pedestal_image.data(), buffer, pixels_nb * sizeof(uint16_t));
+            }
+            else
+            {
+                DEB_TRACE() << "Size is incoherent!";
+                DEB_TRACE() << "Found " << (size / sizeof(uint16_t)) << " elements.";
+                DEB_TRACE() << "Should be " << pixels_nb << " elements.";
+                result = false;
+            }
+        }
+        catch(...)
+        {
+            result = false;
+        }
+    }
+
+    if(buffer != NULL)
+    {
+        delete [] buffer;
+    }
+
+    if(result)
+    {
+        DEB_TRACE() << "File loaded : " << size << " bytes.";
+    }
+    else
+    {
+        DEB_TRACE() << "error occured during opening.";
+    }
+
+    return result;
+}
+
+/*******************************************************************
+ * \brief Erases a dark image file
+ * \param in_file_name complete file name to erase
+ * \return true if success, false if error
+ *******************************************************************/
+bool Camera::eraseDarkImageFile(const std::string & in_file_name) const
+{
+    DEB_MEMBER_FUNCT();
+
+    // delete the dark image
+    bool file_exist;
+
+    {
+        std::ifstream file(in_file_name);
+        file_exist = file;
+    }
+
+    if(file_exist)
+    {
+        if (remove(in_file_name.c_str()) != 0)
+        {
+            DEB_TRACE() << "remove of the previous dark image file " << in_file_name << " failed!";
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/*******************************************************************
+ * \brief Saves a dark image from a file
+ * \param in_file_name complete file name to save
+ * \param in_pedestal_image container which contains the dark image
+ * \return true if success, false if error
+ *******************************************************************/
+bool Camera::saveDarkImageFile(const std::string & in_file_name,
+                               const std::vector<uint16_t> & in_pedestal_image) const
+{
+    DEB_MEMBER_FUNCT();
+
+    // first, delete the previous dark image
+    if(!eraseDarkImageFile(in_file_name))
+    {
+        return false;
+    }
+
+    bool result = true;
+
+    DEB_TRACE() << "opening dark image file " << in_file_name << "...";
+
+    std::ofstream file( in_file_name.c_str(), std::ios::out | std::ios::binary);
+
+    //File has a problem
+    if(!file.is_open())
+    {
+        result = false;
+    }
+    else
+    {
+        // copies all data into buffer
+        try
+        {
+            file.write(reinterpret_cast<const char *>(in_pedestal_image.data()), in_pedestal_image.size() * sizeof(uint16_t));
+            file.close();
+        }
+        catch(...)
+        {
+            result = false;
+        }
+    }
+
+    if(result)
+    {
+        DEB_TRACE() << "File saved : " << in_pedestal_image.size() * sizeof(uint16_t) << " bytes.";
+    }
+    else
+    {
+        DEB_TRACE() << "error occured during saving.";
+    }
+
+    return result;
+}
+
+/*******************************************************************
+ * \brief reset the previous dark images in memory and erase the files
+ *******************************************************************/
+void Camera::resetDarkImageFile()
+{
+    // protecting the concurrent access
+    lima::AutoMutex sdk_mutex = calibrationLock(); 
+
+    m_dark_images_loaded = false;
+    m_pedestal_images.clear();
+
+    for(std::size_t nb_darks = 0 ; nb_darks < m_pedestal_file_names.size() ; nb_darks++)
+    {
+        eraseDarkImageFile(m_pedestal_file_names[nb_darks]);
+    }
+}
+
+/*******************************************************************
+ * \brief update the dark images memory data
+ *******************************************************************/
+void Camera::updateDarkImagesData()
+{
+    // protecting the concurrent access
+    lima::AutoMutex sdk_mutex = calibrationLock(); 
+
+    std::size_t nb_dark_images = m_pedestal_images.size();
+
+    // check if the number of images in memory is correct
+    if(nb_dark_images == m_pedestal_file_names.size())
+    {
+        m_dark_images_loaded = true;
+    }
+    else
+    // a problem occured, we flush the dark images which could have been loaded or created in memory
+    {
+        m_pedestal_images.clear();
+    }
+}
+
+//==================================================================
+// Related to the computing of the intensity coeffs buffer
+//==================================================================
+/*******************************************************************
+ * \brief Updates the intensity coeffs buffer (init or dark images change)
+ * \return true if success, false if error
+ *******************************************************************/
+bool Camera::updateIntensityCoeffs(void)
+{
+    DEB_MEMBER_FUNCT();
+
+    // checking the gain coeffs buffer
+    if(m_gains_coeffs.size() < SLS_NUMBER_OF_DARK_IMAGES)
+    {
+        DEB_TRACE() << "error occured during update of intensity coeffs : invalid gain coeffs!";
+        return false;
+    }
+
+    // protecting the concurrent access
+    lima::AutoMutex sdk_mutex = calibrationLock(); 
+
+    // checking the dark images
+    {
+        if(m_pedestal_images.size() < SLS_NUMBER_OF_DARK_IMAGES)
+        {
+            DEB_TRACE() << "error occured during update of intensity coeffs : invalid dark images!";
+            return false;
+        }
+    }
+    
+    // the intensity coeffs buffer will contain dark image and gain coeffs data :
+    // [Pixel0][dark0|gain0|dark1|gain1|empty|empty|dark2|gain2]...[Pixeli][dark0|gain0|dark1|gain1|dark2|gain2]
+    // in the pixel of the detector, the value for the gain 0 is 0 
+    // in the pixel of the detector, the value for the gain 1 is 1 
+    // in the pixel of the detector, the value for the gain 2 is 3!
+    const int pixels_nb         = m_width * m_height;
+    const int data_nb_per_pixel = (SLS_NUMBER_OF_DARK_IMAGES + 1) * 2; // +1 to add empty space between gain 1 and gain 2
+
+    m_intensity_coeffs.clear();
+    m_intensity_coeffs.resize(pixels_nb * data_nb_per_pixel);
+    memset(m_intensity_coeffs.data(), 0, sizeof(double) * m_intensity_coeffs.size());
+
+    const int gain_position[SLS_NUMBER_OF_DARK_IMAGES] = {0, 2, 6};
+
+    for(int gain_index = 0 ; gain_index < m_gains_coeffs.size() ; gain_index++)
+    {
+        const std::vector<double>   & gain_coeffs    = m_gains_coeffs   [gain_index];
+        const std::vector<uint16_t> & pedestal_image = m_pedestal_images[gain_index]; 
+
+        for(int pixel_index = 0 ; pixel_index < pixels_nb ; pixel_index++)
+        {
+            const int pos = (pixel_index * data_nb_per_pixel) + gain_position[gain_index];
+            
+            // first of all, store the dark image pixel
+            m_intensity_coeffs[pos] = static_cast<double>(pedestal_image[pixel_index]);
+
+            // secondly, store the gain coefficient
+            m_intensity_coeffs[pos + 1] = gain_coeffs[pixel_index];
+        }
+    }
+}
+
+/*******************************************************************
+ * \brief Checks if the intensity coeffs buffer is valid
+ * \return true if the buffer is valid, false if invalid
+ *******************************************************************/
+bool Camera::areIntensityCoeffsValid(void) const
+{
+    // protecting the concurrent access
+    lima::AutoMutex sdk_mutex = calibrationLock(); 
+
+    return !m_intensity_coeffs.empty();
+}
+
+/*******************************************************************
+ * \brief reset the intensity coeffs
+ *******************************************************************/
+void Camera::resetIntensityCoeffs(void)
+{
+    // protecting the concurrent access
+    lima::AutoMutex sdk_mutex = calibrationLock(); 
+
+    m_intensity_coeffs.clear();
+}
+
+//==================================================================
+// Related to acquisition configuration backup and restoration
+//==================================================================
+/*******************************************************************
+ * \brief Gets the acquisition configuration
+ * \param out_configuration this structure will contain the configuration
+ * \return true if the method was successful, else false
+ *******************************************************************/
+bool Camera::getAcqConf(Camera::CameraAcqConf & out_configuration) const
+{
+    DEB_MEMBER_FUNCT();
+
+    // getting the current trigger mode index
+    out_configuration.m_trigger_mode = m_detector_control->setTimingMode(SLS_GET_VALUE);
+
+    // reading the number of frames per cycle
+    out_configuration.m_nb_frames_per_cycle = m_detector_control->setNumberOfFrames(SLS_GET_VALUE);
+
+    // reading the number of cycles
+    out_configuration.m_nb_cycles = m_detector_control->setNumberOfCycles(SLS_GET_VALUE);
+
+    // reading the exposure time in seconds
+    out_configuration.m_exposures_sec = m_detector_control->setExposureTime  (SLS_GET_VALUE, true);
+
+    // reading the exposure period in seconds
+    out_configuration.m_periods_sec = m_detector_control->setExposurePeriod(SLS_GET_VALUE, true); // in seconds
+
+    // getting the current gain mode index
+    out_configuration.m_gain_mode = static_cast<int>(m_detector_control->setSettings(SLS_GET_VALUE));
+
+    return true;
+}
+
+/*******************************************************************
+ * \brief Gets the acquisition configuration
+ * \param in_configuration this structure contains the configuration
+ * \return true if the method was successful, else false
+ *******************************************************************/
+bool Camera::setAcqConf(const Camera::CameraAcqConf in_configuration)
+{
+    DEB_MEMBER_FUNCT();
+
+    // initing the number of frames per cycle and  number of cycles 
+    // to avoid problems during the trigger mode change.
+    m_detector_control->setNumberOfFrames(1);
+    m_detector_control->setNumberOfCycles(1);
+
+    // apply the trigger change
+    m_detector_control->setTimingMode(in_configuration.m_trigger_mode);
+
+    // setting the number of cycles
+    m_detector_control->setNumberOfCycles(in_configuration.m_nb_cycles);
+
+    // setting the number of frames per cycle
+    m_detector_control->setNumberOfFrames(in_configuration.m_nb_frames_per_cycle);
+
+    // setting the exposure time in seconds
+    m_detector_control->setExposureTime  (in_configuration.m_exposures_sec, true);
+
+    // setting the exposure period in seconds
+    m_detector_control->setExposurePeriod(in_configuration.m_periods_sec  , true);
+
+    int result = m_detector_control->setSettings(static_cast<int>(in_configuration.m_gain_mode));
+
+    if(result == slsDetectorDefs::FAIL)
+    {
+        return false;
+    }
+
+    return true;
 }
 
 //==================================================================

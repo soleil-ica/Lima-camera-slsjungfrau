@@ -17,7 +17,6 @@
 
 
 
-
 #include "xfs_types.h"
 #include "xparameters.h"
 #include "FebRegisterDefs.h"
@@ -48,6 +47,9 @@
 		  int BEB_MMAP_SIZE = 0x1000;
 
 		  int Beb_activated = 1;
+
+		  uint32_t Beb_detid = 0;
+		  int Beb_top =0;
 
 
 
@@ -144,7 +146,6 @@ void Beb_Beb(){
 //  Local_LocalLinkInterface1(ll_beb,XPAR_PLB_LL_FIFO_AURORA_DUAL_CTRL_FEB_LEFT_BASEADDR);
 
 //  Beb_SetByteOrder();
-
 }
 
 
@@ -164,8 +165,10 @@ void Beb_GetModuleConfiguration(int* master, int* top, int* normal){
 			ret = Beb_Read32(csp0base, MODULE_CONFIGURATION_MASK);
 			printf("Module Configuration OK\n");
 			printf("Beb: value =0x%x\n",ret);
-			if(ret&TOP_BIT_MASK)
+			if(ret&TOP_BIT_MASK) {
 				*top = 1;
+				Beb_top = 1;
+			}
 			if(ret&MASTER_BIT_MASK)
 				*master = 1;
 			if(ret&NORMAL_MODULE_BIT_MASK)
@@ -412,6 +415,43 @@ int Beb_Activate(int enable){
 }
 
 
+int Beb_Set32bitOverflow(int val) {
+	if(!Beb_activated)
+		return val;
+
+	//mapping new memory
+	u_int32_t* csp0base=0;
+	u_int32_t valueread = 0;
+	u_int32_t offset = FLOW_REG_OFFSET;
+	if(val>0) val = 1;
+
+	//open file pointer
+	int fd = Beb_open(&csp0base,XPAR_PLB_GPIO_SYS_BASEADDR);
+	if(fd < 0){
+		cprintf(BG_RED,"Could not read register to set overflow flag in 32 bit mode. FAIL\n");
+		return -1;
+	}
+	else{
+		if(val > -1){
+			// reset bit
+			valueread = Beb_Read32(csp0base, offset);
+			Beb_Write32(csp0base, offset,valueread & ~FLOW_REG_OVERFLOW_32_BIT_MSK);
+
+			// set bit
+			valueread = Beb_Read32(csp0base, offset);
+			Beb_Write32(csp0base, offset,valueread |
+					((val << FLOW_REG_OVERFLOW_32_BIT_OFST) &  FLOW_REG_OVERFLOW_32_BIT_MSK));
+		}
+
+		valueread = (Beb_Read32(csp0base, offset) & FLOW_REG_OVERFLOW_32_BIT_MSK) >> FLOW_REG_OVERFLOW_32_BIT_OFST;
+	}
+	//close file pointer
+	if(fd > 0)
+		Beb_close(fd,csp0base);
+
+	return valueread;
+}
+
 int Beb_SetNetworkParameter(enum NETWORKINDEX mode, int val){
 
 	if(!Beb_activated)
@@ -438,7 +478,7 @@ int Beb_SetNetworkParameter(enum NETWORKINDEX mode, int val){
 		strcpy(modename,"Transmission Delay Frame");
 		break;
 	case FLOWCTRL_10G:
-		offset = TXM_FLOW_CONTROL_10G;
+		offset = FLOW_REG_OFFSET;
 		strcpy(modename,"Flow Control for 10G");
 		if(val>0) val = 1;
 		break;
@@ -452,14 +492,29 @@ int Beb_SetNetworkParameter(enum NETWORKINDEX mode, int val){
 	}
 	else{
 		if(val > -1){
-			valueread = Beb_Read32(csp0base, offset);
-			//cprintf(BLUE, "%s value before:%d\n",modename,valueread);
-			Beb_Write32(csp0base, offset,val);
-			cprintf(BLUE,"%s value:%d\n", modename,valueread);
+			if (mode != FLOWCTRL_10G) {
+				valueread = Beb_Read32(csp0base, offset);
+				Beb_Write32(csp0base, offset,val);
+			}
+			// flow control reg has other bits for other control
+			else {
+				// reset bit
+				valueread = Beb_Read32(csp0base, offset);
+				Beb_Write32(csp0base, offset,valueread & ~FLOW_REG_TXM_FLOW_CNTRL_10G_MSK);
+
+				// set bit
+				valueread = Beb_Read32(csp0base, offset);
+				Beb_Write32(csp0base, offset,valueread |
+						((val << FLOW_REG_TXM_FLOW_CNTRL_10G_OFST) &  FLOW_REG_TXM_FLOW_CNTRL_10G_MSK));
+
+			}
+
 		}
 
 		valueread = Beb_Read32(csp0base, offset);
-		//cprintf(BLUE,"%s value:%d\n", modename,valueread);
+		if (mode == FLOWCTRL_10G)
+			valueread = (valueread & FLOW_REG_TXM_FLOW_CNTRL_10G_MSK) >> FLOW_REG_TXM_FLOW_CNTRL_10G_OFST;
+
 	}
 	//close file pointer
 	if(fd > 0)
@@ -1124,9 +1179,130 @@ int Beb_GetBebFPGATemp()
 }
 
 
+void Beb_SetDetectorNumber(uint32_t detid) {
+	if(!Beb_activated)
+		return;
+
+	uint32_t swapid = Beb_swap_uint16(detid);
+	//cprintf(GREEN, "detector id %d swapped %d\n", detid, swapid);
+	u_int32_t* csp0base=0;
+	int fd = Beb_open(&csp0base,XPAR_PLB_GPIO_TEST_BASEADDR);
+	if(fd < 0){
+		cprintf(BG_RED,"Set Detector ID FAIL\n");
+		return;
+	}else{
+		uint32_t value = Beb_Read32(csp0base, UDP_HEADER_A_LEFT_OFST);
+		value &= UDP_HEADER_X_MSK;	// to keep previous x value
+		Beb_Write32(csp0base, UDP_HEADER_A_LEFT_OFST, value | ((swapid << UDP_HEADER_ID_OFST) & UDP_HEADER_ID_MSK));
+		value = Beb_Read32(csp0base, UDP_HEADER_A_LEFT_OFST);
+		if((value & UDP_HEADER_ID_MSK) != ((swapid << UDP_HEADER_ID_OFST) & UDP_HEADER_ID_MSK))
+			cprintf(BG_RED,"Set Detector ID FAIL\n");
+
+		value = Beb_Read32(csp0base, UDP_HEADER_A_RIGHT_OFST);
+		value &= UDP_HEADER_X_MSK;	// to keep previous x value
+		Beb_Write32(csp0base, UDP_HEADER_A_RIGHT_OFST, value | ((swapid << UDP_HEADER_ID_OFST) & UDP_HEADER_ID_MSK));
+		value = Beb_Read32(csp0base, UDP_HEADER_A_RIGHT_OFST);
+		if((value & UDP_HEADER_ID_MSK) != ((swapid << UDP_HEADER_ID_OFST) & UDP_HEADER_ID_MSK))
+			cprintf(BG_RED,"Set Detector ID FAIL\n");
+
+		Beb_close(fd,csp0base);
+	}
+	printf("detector id %d has been set in udp header\n", detid);
+}
 
 
 
+int Beb_SetDetectorPosition(int pos[]) {
+	if(!Beb_activated)
+		return OK;
+	cprintf(BLUE,"Got Position values %d %d %d...\n", pos[0],pos[1], pos[2]);
+
+	pos[0] = Beb_swap_uint16(pos[0]);
+	//pos[1] = Beb_swap_uint16(pos[1]);
+	pos[2] = Beb_swap_uint16(pos[2]);
+
+	int ret = FAIL;
+	//mapping new memory to read master top module configuration
+	u_int32_t* csp0base=0;
+	//open file pointer
+	int fd = Beb_open(&csp0base,XPAR_PLB_GPIO_TEST_BASEADDR);
+	if(fd < 0){
+		cprintf(BG_RED,"Set Detector Position FAIL\n");
+		return FAIL;
+	}else{
+		uint32_t value = 0;
+		ret = OK;
+		// x left
+		value = Beb_Read32(csp0base, UDP_HEADER_A_LEFT_OFST);
+		value &= UDP_HEADER_ID_MSK;	// to keep previous id value
+		Beb_Write32(csp0base, UDP_HEADER_A_LEFT_OFST, value | ((pos[0] << UDP_HEADER_X_OFST) & UDP_HEADER_X_MSK));
+		value = Beb_Read32(csp0base, UDP_HEADER_A_LEFT_OFST);
+		if((value & UDP_HEADER_X_MSK) != ((pos[0] << UDP_HEADER_X_OFST) & UDP_HEADER_X_MSK))
+			ret = FAIL;
+
+		// x right
+		value = Beb_Read32(csp0base, UDP_HEADER_A_RIGHT_OFST);
+		value &= UDP_HEADER_ID_MSK;	// to keep previous id value
+		Beb_Write32(csp0base, UDP_HEADER_A_RIGHT_OFST, value | ((pos[0] << UDP_HEADER_X_OFST) & UDP_HEADER_X_MSK));
+		value = Beb_Read32(csp0base, UDP_HEADER_A_RIGHT_OFST);
+		if((value & UDP_HEADER_X_MSK) != ((pos[0] << UDP_HEADER_X_OFST) & UDP_HEADER_X_MSK))
+			ret = FAIL;
+
+
+
+		// y left (column)
+		// overwriting z anyway, so no need to look at previous z value
+		int posval = Beb_swap_uint16(Beb_top ? pos[1] : (pos[1]+1));
+		Beb_Write32(csp0base, UDP_HEADER_B_LEFT_OFST, ((posval << UDP_HEADER_Y_OFST) & UDP_HEADER_Y_MSK));
+		value = Beb_Read32(csp0base, UDP_HEADER_B_LEFT_OFST);
+		if(value  != ((posval << UDP_HEADER_Y_OFST) & UDP_HEADER_Y_MSK))
+			ret = FAIL;
+
+		// y right
+		// overwriting z anyway, so no need to look at previous z value
+		posval = Beb_swap_uint16(Beb_top ? (pos[1]+1) : pos[1]);
+		Beb_Write32(csp0base, UDP_HEADER_B_RIGHT_OFST, ((posval << UDP_HEADER_Y_OFST) & UDP_HEADER_Y_MSK));
+		value = Beb_Read32(csp0base, UDP_HEADER_B_RIGHT_OFST);
+		if(value  != ((posval << UDP_HEADER_Y_OFST) & UDP_HEADER_Y_MSK))
+			ret = FAIL;
+
+
+
+		// z left
+		value = Beb_Read32(csp0base, UDP_HEADER_B_LEFT_OFST);
+		value &= UDP_HEADER_Y_MSK;	// to keep previous y value
+		Beb_Write32(csp0base, UDP_HEADER_B_LEFT_OFST, value | ((pos[2] << UDP_HEADER_Z_OFST) & UDP_HEADER_Z_MSK));
+		value = Beb_Read32(csp0base, UDP_HEADER_B_LEFT_OFST);
+		if((value & UDP_HEADER_Z_MSK) != ((pos[2] << UDP_HEADER_Z_OFST) & UDP_HEADER_Z_MSK))
+			ret = FAIL;
+
+		// z right
+		value = Beb_Read32(csp0base, UDP_HEADER_B_RIGHT_OFST);
+		value &= UDP_HEADER_Y_MSK;	// to keep previous y value
+		Beb_Write32(csp0base, UDP_HEADER_B_RIGHT_OFST, value | ((pos[2] << UDP_HEADER_Z_OFST) & UDP_HEADER_Z_MSK));
+		value = Beb_Read32(csp0base, UDP_HEADER_B_RIGHT_OFST);
+		if((value & UDP_HEADER_Z_MSK) != ((pos[2] << UDP_HEADER_Z_OFST) & UDP_HEADER_Z_MSK))
+			ret = FAIL;
+
+
+		//close file pointer
+		Beb_close(fd,csp0base);
+	}
+	if (ret == OK) {
+		cprintf(BLUE, "Position set to...\n"
+				"Left: [%d, %d, %d]\n"
+				"Right:[%d, %d, %d]\n",
+				 Beb_swap_uint16(pos[0]), Beb_top ? pos[1] : (pos[1]+1), Beb_swap_uint16(pos[2]),
+				 Beb_swap_uint16(pos[0]), Beb_top ? (pos[1]+1) : pos[1], Beb_swap_uint16(pos[2]));
+	}
+
+	return ret;
+}
+
+
+uint16_t Beb_swap_uint16( uint16_t val) {
+    return (val << 8) | (val >> 8 );
+}
 
 int Beb_open(u_int32_t** csp0base, u_int32_t offset){
 

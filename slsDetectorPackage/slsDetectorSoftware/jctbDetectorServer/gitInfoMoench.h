@@ -1,6 +1,6 @@
-#define GITURL "git@gitorious.psi.ch:sls_det_software/sls_detector_software.git/moenchDetectorServer"
-#define GITREPUUID "046a469b1e6582c4c55bd6eaeb4818b618d0a9a9"
-#define GITAUTH "Maliakal_Dhanya"
-#define GITREV 0x14
-#define GITDATE 0x20140603
-#define GITBRANCH "blabla"
+#define GITURL "git@github.com:slsdetectorgroup/slsDetectorPackage.git"
+#define GITREPUUID "9ae128961675230ad322ff2867f1862dbe8566a7"
+#define GITAUTH "Anna_Bergamaschi"
+#define GITREV 0x3764
+#define GITDATE 0x20180507
+#define GITBRANCH "developer"

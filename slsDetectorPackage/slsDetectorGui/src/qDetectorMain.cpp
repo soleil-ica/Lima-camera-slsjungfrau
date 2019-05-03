@@ -99,8 +99,7 @@ qDetectorMain::qDetectorMain(int argc, char **argv, QApplication *app, int& ret,
 			break;
 
 		case 'v':
-			tempval = GITREV;
-			tempval = (tempval <<32) | GITDATE;
+			tempval = GITDATE;
 			cout << "SLS Detector GUI " << GITBRANCH << " (0x" << hex << tempval << ")" << endl;
 			return;
 
@@ -288,6 +287,7 @@ void qDetectorMain::SetUpDetector(const string fName){
 	case slsDetectorDefs::PROPIX:
 	case slsDetectorDefs::MOENCH:
 	case slsDetectorDefs::JUNGFRAU:
+	case slsDetectorDefs::JUNGFRAUCTB:
 		actionLoadTrimbits->setText("Load Settings");  actionSaveTrimbits->setText("Save Settings");
 		break;
 	default:
@@ -336,7 +336,6 @@ void qDetectorMain::Initialization(){
 // Plotting
 	// When the acquisition is finished, must update the meas tab
 	connect(myPlot,	SIGNAL(UpdatingPlotFinished()),				this,				SLOT(EnableTabs()));
-	connect(myPlot,	SIGNAL(AcquisitionFinishedSignal()),		tab_measurement,	SLOT(AcquisitionFinished()));
 	connect(myPlot,	SIGNAL(UpdatingPlotFinished()),				tab_measurement,	SLOT(UpdateFinished()));
 	//This should not be called as it will change file name to measurement when run finished
 	//connect(myPlot,	SIGNAL(UpdatingPlotFinished()),				tab_plot,			SLOT(Refresh()));
@@ -522,7 +521,7 @@ void qDetectorMain::ExecuteUtilities(QAction *action){
 		}
 	}
 	else if(action==actionLoadTrimbits){
-		QString fName = QString(myDet->getSettingsDir());
+		QString fName = QString( (myDet->getSettingsDir()).c_str());
 		qDefs::checkErrorMessage(myDet,"qDetectorMain::ExecuteUtilities");
 		//gotthard
 		if(actionLoadTrimbits->text().contains("Settings")){
@@ -569,7 +568,7 @@ void qDetectorMain::ExecuteUtilities(QAction *action){
 			cout << "Saving Settings" << endl;
 #endif
 			//different output directory so as not to overwrite
-			QString fName = QString(myDet->getSettingsDir());
+			QString fName = QString( (myDet->getSettingsDir()).c_str() );
 			qDefs::checkErrorMessage(myDet,"qDetectorMain::ExecuteUtilities");
 			fName = QFileDialog::getSaveFileName(this,
 					tr("Save Current Detector Settings"),fName,
@@ -586,7 +585,7 @@ void qDetectorMain::ExecuteUtilities(QAction *action){
 #ifdef VERBOSE
 			cout << "Saving Trimbits" << endl;
 #endif//different output directory so as not to overwrite
-			QString fName = QString(myDet->getSettingsDir());
+			QString fName = QString( (myDet->getSettingsDir()).c_str() );
 			qDefs::checkErrorMessage(myDet,"qDetectorMain::ExecuteUtilities");
 			fName = QFileDialog::getSaveFileName(this,
 					tr("Save Current Detector Trimbits"),fName,
@@ -604,7 +603,7 @@ void qDetectorMain::ExecuteUtilities(QAction *action){
 #ifdef VERBOSE
 		cout << "Loading Calibration Data" << endl;
 #endif
-		QString fName = QString(myDet->getCalDir());
+		QString fName = QString( (myDet->getCalDir()).c_str() );
 		qDefs::checkErrorMessage(myDet);
 
 		//so that even nonexisting files can be selected
@@ -627,7 +626,7 @@ void qDetectorMain::ExecuteUtilities(QAction *action){
 #ifdef VERBOSE
 		cout << "Saving Calibration Data" << endl;
 #endif//different output directory so as not to overwrite
-		QString fName = QString(myDet->getCalDir());
+		QString fName = QString( (myDet->getCalDir()).c_str()  );
 		qDefs::checkErrorMessage(myDet);
 		fName = QFileDialog::getSaveFileName(this,
 				tr("Save Current Detector Calibration Data"),fName,
@@ -665,8 +664,7 @@ void qDetectorMain::ExecuteHelp(QAction *action){
 		cout << "About: Common GUI for Mythen, Eiger, Gotthard, Jungfrau, Moench and Propix detectors" << endl;
 #endif
 		char version[200];
-		long long unsigned int retval= GITREV;
-		retval= (retval <<32) | GITDATE;
+		long long unsigned int retval= GITDATE;
 		sprintf(version,"%llx",retval);
 		string thisGUIVersion = string(version);
 

@@ -1,4 +1,4 @@
-# LaTeX2HTML 2008 (1.71)
+# LaTeX2HTML 2012 (1.2)
 # Associate images original text with physical files.
 
 
@@ -50,7 +50,7 @@ $">|;
 
 $key = q/displaystylemathsf{GoF}_{(2)}=sqrt{{ensuremath{displaystyle{frac{{ensuremath{dismath{left({langlexrangle^*-langlexrangle_{!mathrm{w(2)}}+1}right)}}};MSF=1.6;AAT/;
 $cached_env_img{$key} = q|<IMG
- WIDTH="569" HEIGHT="189" ALIGN="MIDDLE" BORDER="0"
+ WIDTH="568" HEIGHT="189" ALIGN="MIDDLE" BORDER="0"
  SRC="|."$dir".q|img169.png"
  ALT="$\displaystyle \mathsf{GoF}_{(2)}=
 \sqrt{
@@ -101,7 +101,7 @@ $cached_env_img{$key} = q|<IMG
 
 $key = q/{displaymath}textrm{textbf{MEASUREMENTS}}leftUpdownarrow,{array}{l}%textrm{Measuightarrow,textrm{Stopscript}{array}%right.{array}right.{displaymath};MSF=1.6;AAT/;
 $cached_env_img{$key} = q|<IMG
- WIDTH="698" HEIGHT="637" BORDER="0"
+ WIDTH="699" HEIGHT="637" BORDER="0"
  SRC="|."$dir".q|img7.png"
  ALT="\begin{displaymath}\textrm{\textbf{MEASUREMENTS}} \\\\
 \left\Updownarrow  
@@ -127,19 +127,19 @@ $cached_env_img{$key} = q|<IMG
  SRC="|."$dir".q|img149.png"
  ALT="$ N_{\mathrm{obs}}^*$">|; 
 
-$key = q/displaystyle{sigma}_{langlexrangle_{!mathrm{w}}}^{mathrm{corrected}}=mathsf{GoF}sigma_{langlexrangle_{!mathrm{w}}};MSF=1.6;AAT/;
-$cached_env_img{$key} = q|<IMG
- WIDTH="154" HEIGHT="37" ALIGN="MIDDLE" BORDER="0"
- SRC="|."$dir".q|img157.png"
- ALT="$\displaystyle {\sigma}_{\langle x \rangle_{\!\mathrm{w}}}^{\mathrm{corrected}} = \mathsf{GoF} \sigma_{\langle x \rangle_{\!\mathrm{w}}}
-$">|; 
-
 $key = q/displaystyleY_ell=mathop{sum_{k,j}}_{{ensuremath{left|{b_{k,j}capB_ell}right|}}>displaystyle{B}}}}}}}{ensuremath{left({sigma_{r_{k,j}}}right)}}^{-2};MSF=1.6;AAT/;
 $cached_env_img{$key} = q|<IMG
  WIDTH="254" HEIGHT="87" ALIGN="MIDDLE" BORDER="0"
  SRC="|."$dir".q|img108.png"
  ALT="$\displaystyle Y_\ell=\mathop{\sum_{k,j}}_{ {\ensuremath{\left\vert{ b_{k,j}\cap...
 ...th{\displaystyle{B}}}}}}} {\ensuremath{\left({\sigma_{r_{k,j}}}\right)}}^{-2}
+$">|; 
+
+$key = q/displaystyle{sigma}_{langlexrangle_{!mathrm{w}}}^{mathrm{corrected}}=mathsf{GoF}sigma_{langlexrangle_{!mathrm{w}}};MSF=1.6;AAT/;
+$cached_env_img{$key} = q|<IMG
+ WIDTH="154" HEIGHT="37" ALIGN="MIDDLE" BORDER="0"
+ SRC="|."$dir".q|img157.png"
+ ALT="$\displaystyle {\sigma}_{\langle x \rangle_{\!\mathrm{w}}}^{\mathrm{corrected}} = \mathsf{GoF} \sigma_{\langle x \rangle_{\!\mathrm{w}}}
 $">|; 
 
 $key = q/displaystyleR_ell={ensuremath{displaystyle{frac{{ensuremath{displaystyle{X_ell}}uremath{displaystyle{e(C+1)}}}}{{ensuremath{displaystyle{m|b|}}}}}}};MSF=1.6;AAT/;
@@ -172,7 +172,7 @@ $">|;
 
 $key = q/Resolution=4;MSF=1.6;AAT/;
 $cached_env_img{$key} = q|<IMG
- WIDTH="111" HEIGHT="14" ALIGN="BOTTOM" BORDER="0"
+ WIDTH="111" HEIGHT="15" ALIGN="BOTTOM" BORDER="0"
  SRC="|."$dir".q|img34.png"
  ALT="$ Resolution=4$">|; 
 
@@ -204,7 +204,7 @@ $cached_env_img{$key} = q|<IMG
 
 $key = q/{ensuremath{{2theta}}};MSF=1.6;AAT/;
 $cached_env_img{$key} = q|<IMG
- WIDTH="20" HEIGHT="14" ALIGN="BOTTOM" BORDER="0"
+ WIDTH="20" HEIGHT="15" ALIGN="BOTTOM" BORDER="0"
  SRC="|."$dir".q|img63.png"
  ALT="$ {\ensuremath{{2\theta}}}$">|; 
 
@@ -263,7 +263,7 @@ $">|;
 
 $key = q/N=10^8;MSF=1.6;AAT/;
 $cached_env_img{$key} = q|<IMG
- WIDTH="63" HEIGHT="16" ALIGN="BOTTOM" BORDER="0"
+ WIDTH="63" HEIGHT="17" ALIGN="BOTTOM" BORDER="0"
  SRC="|."$dir".q|img196.png"
  ALT="$ N=10^8$">|; 
 
@@ -338,13 +338,13 @@ $cached_env_img{$key} = q|<IMG
 
 $key = q/Rightarrow;MSF=1.6;AAT/;
 $cached_env_img{$key} = q|<IMG
- WIDTH="20" HEIGHT="13" ALIGN="BOTTOM" BORDER="0"
+ WIDTH="20" HEIGHT="14" ALIGN="BOTTOM" BORDER="0"
  SRC="|."$dir".q|img6.png"
  ALT="$ \Rightarrow$">|; 
 
 $key = q/d;MSF=1.6;AAT/;
 $cached_env_img{$key} = q|<IMG
- WIDTH="13" HEIGHT="14" ALIGN="BOTTOM" BORDER="0"
+ WIDTH="13" HEIGHT="15" ALIGN="BOTTOM" BORDER="0"
  SRC="|."$dir".q|img4.png"
  ALT="$ d$">|; 
 
@@ -356,7 +356,7 @@ $cached_env_img{$key} = q|<IMG
 
 $key = q/2thetaequiv{ensuremath{{2theta}}};MSF=1.6;AAT/;
 $cached_env_img{$key} = q|<IMG
- WIDTH="57" HEIGHT="14" ALIGN="BOTTOM" BORDER="0"
+ WIDTH="57" HEIGHT="15" ALIGN="BOTTOM" BORDER="0"
  SRC="|."$dir".q|img76.png"
  ALT="$ 2\theta\equiv{\ensuremath{{2\theta}}}$">|; 
 
@@ -494,7 +494,7 @@ $">|;
 
 $key = q/Vthreshold=7;MSF=1.6;AAT/;
 $cached_env_img{$key} = q|<IMG
- WIDTH="114" HEIGHT="14" ALIGN="BOTTOM" BORDER="0"
+ WIDTH="114" HEIGHT="15" ALIGN="BOTTOM" BORDER="0"
  SRC="|."$dir".q|img32.png"
  ALT="$ Vthreshold=7$">|; 
 
@@ -705,13 +705,13 @@ $cached_env_img{$key} = q|<IMG
 
 $key = q/b;MSF=1.6;AAT/;
 $cached_env_img{$key} = q|<IMG
- WIDTH="11" HEIGHT="14" ALIGN="BOTTOM" BORDER="0"
+ WIDTH="11" HEIGHT="15" ALIGN="BOTTOM" BORDER="0"
  SRC="|."$dir".q|img120.png"
  ALT="$ b$">|; 
 
 $key = q/x;MSF=1.6;AAT/;
 $cached_env_img{$key} = q|<IMG
- WIDTH="14" HEIGHT="13" ALIGN="BOTTOM" BORDER="0"
+ WIDTH="14" HEIGHT="14" ALIGN="BOTTOM" BORDER="0"
  SRC="|."$dir".q|img144.png"
  ALT="$ x$">|; 
 
@@ -846,7 +846,7 @@ $cached_env_img{$key} = q|<IMG
 
 $key = q/includegraphics[width=textwidth]{multi_detector};AAT/;
 $cached_env_img{$key} = q|<IMG
- WIDTH="554" HEIGHT="139" ALIGN="BOTTOM" BORDER="0"
+ WIDTH="554" HEIGHT="140" ALIGN="BOTTOM" BORDER="0"
  SRC="|."$dir".q|img2.png"
  ALT="\includegraphics[width=\textwidth]{multi_detector}">|; 
 
@@ -864,13 +864,13 @@ $">|;
 
 $key = q/2theta;MSF=1.6;AAT/;
 $cached_env_img{$key} = q|<IMG
- WIDTH="20" HEIGHT="14" ALIGN="BOTTOM" BORDER="0"
+ WIDTH="20" HEIGHT="15" ALIGN="BOTTOM" BORDER="0"
  SRC="|."$dir".q|img64.png"
  ALT="$ 2\theta$">|; 
 
 $key = q/O;MSF=1.6;AAT/;
 $cached_env_img{$key} = q|<IMG
- WIDTH="17" HEIGHT="14" ALIGN="BOTTOM" BORDER="0"
+ WIDTH="17" HEIGHT="15" ALIGN="BOTTOM" BORDER="0"
  SRC="|."$dir".q|img101.png"
  ALT="$ O$">|; 
 
@@ -900,7 +900,7 @@ $cached_env_img{$key} = q|<IMG
 
 $key = q/ell;MSF=1.6;AAT/;
 $cached_env_img{$key} = q|<IMG
- WIDTH="11" HEIGHT="14" ALIGN="BOTTOM" BORDER="0"
+ WIDTH="11" HEIGHT="15" ALIGN="BOTTOM" BORDER="0"
  SRC="|."$dir".q|img94.png"
  ALT="$ \ell$">|; 
 
@@ -920,7 +920,7 @@ $cached_env_img{$key} = q|<IMG
 
 $key = q/k;MSF=1.6;AAT/;
 $cached_env_img{$key} = q|<IMG
- WIDTH="13" HEIGHT="14" ALIGN="BOTTOM" BORDER="0"
+ WIDTH="13" HEIGHT="15" ALIGN="BOTTOM" BORDER="0"
  SRC="|."$dir".q|img73.png"
  ALT="$ k$">|; 
 
@@ -985,7 +985,7 @@ $cached_env_img{$key} = q|<IMG
 
 $key = q/Counts=500;MSF=1.6;AAT/;
 $cached_env_img{$key} = q|<IMG
- WIDTH="102" HEIGHT="14" ALIGN="BOTTOM" BORDER="0"
+ WIDTH="102" HEIGHT="15" ALIGN="BOTTOM" BORDER="0"
  SRC="|."$dir".q|img33.png"
  ALT="$ Counts=500$">|; 
 
@@ -999,7 +999,7 @@ $">|;
 
 $key = q/Deltat;MSF=1.6;AAT/;
 $cached_env_img{$key} = q|<IMG
- WIDTH="24" HEIGHT="14" ALIGN="BOTTOM" BORDER="0"
+ WIDTH="24" HEIGHT="15" ALIGN="BOTTOM" BORDER="0"
  SRC="|."$dir".q|img68.png"
  ALT="$ \Delta t$">|; 
 
@@ -1053,7 +1053,7 @@ $cached_env_img{$key} = q|<IMG
 
 $key = q/displaystyleE{ensuremath{left({{ensuremath{displaystyle{frac{{ensuremath{displayh{displaystyle{lambda^{n+m}}}}}{{ensuremath{displaystyle{n!m!}}}}}}};MSF=1.6;AAT/;
 $cached_env_img{$key} = q|<IMG
- WIDTH="579" HEIGHT="65" ALIGN="MIDDLE" BORDER="0"
+ WIDTH="578" HEIGHT="65" ALIGN="MIDDLE" BORDER="0"
  SRC="|."$dir".q|img185.png"
  ALT="$\displaystyle E{\ensuremath{\left({{\ensuremath{\displaystyle{\frac{{\ensuremat...
 ...uremath{\displaystyle{\lambda^{n+m}}}}}{{\ensuremath{\displaystyle{n!m!}}}}}}}
@@ -1171,7 +1171,7 @@ $cached_env_img{$key} = q|<IMG
 
 $key = q/DeltaOmegaproptoDelta{ensuremath{{2theta}}};MSF=1.6;AAT/;
 $cached_env_img{$key} = q|<IMG
- WIDTH="80" HEIGHT="14" ALIGN="BOTTOM" BORDER="0"
+ WIDTH="80" HEIGHT="15" ALIGN="BOTTOM" BORDER="0"
  SRC="|."$dir".q|img71.png"
  ALT="$ \Delta\Omega\propto \Delta {\ensuremath{{2\theta}}}$">|; 
 
@@ -1270,17 +1270,17 @@ $cached_env_img{$key} = q|<IMG
 }
 $">|; 
 
-$key = q/sqrt{C_0};MSF=1.6;AAT/;
-$cached_env_img{$key} = q|<IMG
- WIDTH="36" HEIGHT="35" ALIGN="MIDDLE" BORDER="0"
- SRC="|."$dir".q|img129.png"
- ALT="$ \sqrt{C_0}$">|; 
-
 $key = q/includegraphics[width=textwidth]{imagesslashtrimbitplot};AAT/;
 $cached_env_img{$key} = q|<IMG
  WIDTH="554" HEIGHT="275" ALIGN="BOTTOM" BORDER="0"
  SRC="|."$dir".q|img38.png"
  ALT="\includegraphics[width=\textwidth]{images/trimbitplot}">|; 
+
+$key = q/sqrt{C_0};MSF=1.6;AAT/;
+$cached_env_img{$key} = q|<IMG
+ WIDTH="36" HEIGHT="35" ALIGN="MIDDLE" BORDER="0"
+ SRC="|."$dir".q|img129.png"
+ ALT="$ \sqrt{C_0}$">|; 
 
 $key = q/P;MSF=1.6;AAT/;
 $cached_env_img{$key} = q|<IMG
@@ -1368,7 +1368,7 @@ $cached_env_img{$key} = q|<IMG
 
 $key = q/includegraphics[width=textwidth]{imagesslashtrigger_acquisition.eps};AAT/;
 $cached_env_img{$key} = q|<IMG
- WIDTH="555" HEIGHT="199" ALIGN="BOTTOM" BORDER="0"
+ WIDTH="555" HEIGHT="200" ALIGN="BOTTOM" BORDER="0"
  SRC="|."$dir".q|img10.png"
  ALT="\includegraphics[width=\textwidth]{images/trigger_acquisition.eps}">|; 
 
@@ -1380,7 +1380,7 @@ $cached_env_img{$key} = q|<IMG
 
 $key = q/k=0ldotss;MSF=1.6;AAT/;
 $cached_env_img{$key} = q|<IMG
- WIDTH="74" HEIGHT="14" ALIGN="BOTTOM" BORDER="0"
+ WIDTH="74" HEIGHT="15" ALIGN="BOTTOM" BORDER="0"
  SRC="|."$dir".q|img189.png"
  ALT="$ k=0\ldots s$">|; 
 
@@ -1398,7 +1398,7 @@ $cached_env_img{$key} = q|<IMG
 
 $key = q/includegraphics[width=textwidth]{imagesslashnormal_acquisition.eps};AAT/;
 $cached_env_img{$key} = q|<IMG
- WIDTH="555" HEIGHT="159" ALIGN="BOTTOM" BORDER="0"
+ WIDTH="555" HEIGHT="158" ALIGN="BOTTOM" BORDER="0"
  SRC="|."$dir".q|img8.png"
  ALT="\includegraphics[width=\textwidth]{images/normal_acquisition.eps}">|; 
 
@@ -1540,7 +1540,7 @@ $">|;
 
 $key = q/n;MSF=1.6;AAT/;
 $cached_env_img{$key} = q|<IMG
- WIDTH="14" HEIGHT="13" ALIGN="BOTTOM" BORDER="0"
+ WIDTH="14" HEIGHT="14" ALIGN="BOTTOM" BORDER="0"
  SRC="|."$dir".q|img130.png"
  ALT="$ n$">|; 
 

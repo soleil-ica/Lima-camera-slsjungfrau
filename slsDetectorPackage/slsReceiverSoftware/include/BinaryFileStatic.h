@@ -14,7 +14,8 @@
 #include <string>
 #include <iomanip>
 #include <string.h>
-using namespace std;
+
+#define MAX_MASTER_FILE_LENGTH 2000
 
 
 class BinaryFileStatic {
@@ -42,10 +43,10 @@ class BinaryFileStatic {
 	static std::string CreateFileName(char* fpath, char* fnameprefix, uint64_t findex, bool frindexenable,
 			uint64_t fnum = 0, int dindex = -1, int numunits = 1, int unitindex = 0)
 	{
-		ostringstream osfn;
+		std::ostringstream osfn;
 		osfn << fpath << "/" << fnameprefix;
-		if (dindex >= 0) osfn << "_d" << ((unitindex >= numunits) ? unitindex : (dindex * numunits + unitindex));	//if unit index > numunits, all receivers in one program (userReceiver)
-		if (frindexenable) osfn << "_f" << setfill('0') << setw(12) << fnum;
+		if (dindex >= 0) osfn << "_d" << (dindex * numunits + unitindex);
+		if (frindexenable) osfn << "_f" << std::setfill('0') << std::setw(12) << fnum;
 		osfn << "_" << findex;
 		osfn << ".raw";
 		return osfn.str();
@@ -58,9 +59,9 @@ class BinaryFileStatic {
 	 * @param findex file index
 	 * @returns master file name
 	 */
-	string CreateMasterFileName(char* fpath, char* fnameprefix, uint64_t findex)
+	std::string CreateMasterFileName(char* fpath, char* fnameprefix, uint64_t findex)
 	{
-		ostringstream osfn;
+		std::ostringstream osfn;
 		osfn << fpath << "/" << fnameprefix;
 		osfn << "_master";
 		osfn << "_" << findex;
@@ -84,10 +85,9 @@ class BinaryFileStatic {
 	 * @param fd file pointer
 	 * @param buf buffer to write from
 	 * @param bsize size of buffer
-	 * @param fnum current image number
 	 * @returns number of elements written
 	 */
-	static int WriteDataFile(FILE* fd, char* buf, int bsize, uint64_t fnum)
+	static int WriteDataFile(FILE* fd, char* buf, int bsize)
 	{
 		if (!fd)
 			return 0;
@@ -106,15 +106,20 @@ class BinaryFileStatic {
 	 * @param nPixelsX number of pixels in x direction
 	 * @param nPixelsY number of pixels in y direction
 	 * @param nf number of images
+	 * @param maxf maximum frames per file
 	 * @param acquisitionTime acquisition time
 	 * @param acquisitionPeriod acquisition period
 	 * @param subexposuretime sub exposure time
+	 * @param subperiod sub period
 	 * @param version version of software for binary writing
 	 * @returns 0 for success and 1 for fail
 	 */
-	static int CreateMasterDataFile(FILE*& fd, string fname, bool owenable,
-					uint32_t dr, bool tenE,	uint32_t size, uint32_t nPixelsX, uint32_t nPixelsY, uint64_t nf,
-					uint64_t acquisitionTime, uint64_t subexposuretime, uint64_t acquisitionPeriod, double version)
+	static int CreateMasterDataFile(FILE*& fd, std::string fname, bool owenable,
+					uint32_t dr, bool tenE,	uint32_t size,
+					uint32_t nPixelsX, uint32_t nPixelsY, uint64_t nf,
+					uint32_t maxf,
+					uint64_t acquisitionTime, uint64_t subexposuretime,
+					uint64_t subperiod, uint64_t acquisitionPeriod, double version)
 	{
 		if(!owenable){
 			if (NULL == (fd = fopen((const char *) fname.c_str(), "wx"))){
@@ -128,34 +133,37 @@ class BinaryFileStatic {
 			return 1;
 		}
 		time_t t = time(0);
-		char message[MAX_STR_LENGTH];
+		char message[MAX_MASTER_FILE_LENGTH];
 		sprintf(message,
-				"Version            		: %.1f\n"
-				"Dynamic Range      		: %d\n"
-				"Ten Giga           		: %d\n"
-				"Image Size         		: %d bytes\n"
-				"x                  		: %d pixels\n"
-				"y                  		: %d pixels\n"
-				"Total Frames       		: %lld\n"
-				"Exptime (ns)       		: %lld\n"
-				"SubExptime (ns)    		: %lld\n"
-				"Period (ns)        		: %lld\n"
-				"Timestamp          		: %s\n\n"
+				"Version                    : %.1f\n"
+				"Dynamic Range              : %d\n"
+				"Ten Giga                   : %d\n"
+				"Image Size                 : %d bytes\n"
+				"row                        : %d pixels\n"
+				"col                        : %d pixels\n"
+				"Max. Frames Per File       : %u\n"
+				"Total Frames               : %lld\n"
+				"Exptime (ns)               : %lld\n"
+				"SubExptime (ns)            : %lld\n"
+				"SubPeriod(ns)              : %lld\n"
+				"Period (ns)                : %lld\n"
+				"Timestamp                  : %s\n\n"
 
 				"#Frame Header\n"
-				"Frame Number       		: 8 bytes\n"
-				"SubFrame Number/ExpLength	: 4 bytes\n"
-				"Packet Number      		: 4 bytes\n"
-				"Bunch ID           		: 8 bytes\n"
-				"Timestamp          		: 8 bytes\n"
-				"Module Id         		 	: 2 bytes\n"
-				"X Coordinate       		: 2 bytes\n"
-				"Y Coordinate       		: 2 bytes\n"
-				"Z Coordinate       		: 2 bytes\n"
-				"Debug              		: 4 bytes\n"
-				"Round Robin Number 		: 2 bytes\n"
-				"Detector Type      		: 1 byte\n"
-				"Header Version     		: 1 byte\n"
+				"Frame Number               : 8 bytes\n"
+				"SubFrame Number/ExpLength  : 4 bytes\n"
+				"Packet Number              : 4 bytes\n"
+				"Bunch ID                   : 8 bytes\n"
+				"Timestamp                  : 8 bytes\n"
+				"Module Id                  : 2 bytes\n"
+				"Row                        : 2 bytes\n"
+				"Column                     : 2 bytes\n"
+				"Reserved                   : 2 bytes\n"
+				"Debug                      : 4 bytes\n"
+				"Round Robin Number         : 2 bytes\n"
+				"Detector Type              : 1 byte\n"
+				"Header Version             : 1 byte\n"
+				"Packets Caught Mask        : 64 bytes\n"
 				,
 				version,
 				dr,
@@ -163,14 +171,16 @@ class BinaryFileStatic {
 				size,
 				nPixelsX,
 				nPixelsY,
+				maxf,
 				(long long int)nf,
 				(long long int)acquisitionTime,
 				(long long int)subexposuretime,
+				(long long int)subperiod,
 				(long long int)acquisitionPeriod,
 				ctime(&t));
-		if (strlen(message) > MAX_STR_LENGTH) {
+		if (strlen(message) > MAX_MASTER_FILE_LENGTH) {
 			cprintf(RED,"Master File Size %d is greater than max str size %d\n",
-					(int)strlen(message), MAX_STR_LENGTH);
+					(int)strlen(message), MAX_MASTER_FILE_LENGTH);
 			return 1;
 		}
 

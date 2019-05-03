@@ -124,22 +124,10 @@ namespace lima
                                                     void     * in_user_data);
 
             // Get Receiver Data Call back
-            static void acquisitionDataReadyCallBack(uint64_t   in_frame_number  ,
-                                                     uint32_t   in_exp_length    ,
-                                                     uint32_t   in_packet_number ,
-                                                     uint64_t   in_bunch_id      ,
-                                                     uint64_t   in_timestamp     ,
-                                                     uint16_t   in_mod_id        ,
-                                                     uint16_t   in_x_coord       ,
-                                                     uint16_t   in_y_coord       ,
-                                                     uint16_t   in_z_coord       ,
-                                                     uint32_t   in_debug         ,
-                                                     uint16_t   in_round_r_number,
-                                                     uint8_t    in_det_type      ,
-                                                     uint8_t    in_version       ,
-                                                     char     * in_data_pointer  ,
-                                                     uint32_t   in_data_size     ,
-                                                     void     * in_user_data     );
+            static void acquisitionDataReadyCallBack(char     * in_meta_data   ,
+                                                     char     * in_data_pointer,
+                                                     uint32_t   in_data_size   ,
+                                                     void     * in_user_data   );
 
         private:
             // direct access to camera

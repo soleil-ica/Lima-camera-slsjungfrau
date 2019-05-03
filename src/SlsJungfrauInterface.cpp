@@ -162,6 +162,11 @@ void Interface::getStatus(StatusType & status)
         hw_status = HwInterface::StatusType::Exposure;
     }
     else
+    if(camera_status == Camera::Status::Calibration)
+    {
+        hw_status = HwInterface::StatusType::Config;
+    }
+    else
     if(camera_status == Camera::Status::Error)
     {
         hw_status = HwInterface::StatusType::Fault;

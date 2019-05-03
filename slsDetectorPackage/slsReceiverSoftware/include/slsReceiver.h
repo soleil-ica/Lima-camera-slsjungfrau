@@ -25,11 +25,11 @@ class slsReceiver : private virtual slsReceiverDefs {
 	 * Constructor
 	 * Starts up a Receiver server. Reads configuration file, options, and
 	 * assembles a Receiver using TCP and UDP detector interfaces
+	 * throws an exception in case of failure
 	 * @param argc from command line
 	 * @param argv from command line
-	 * @param succecc socket creation was successfull
 	 */
-	slsReceiver(int argc, char *argv[], int &success);
+	slsReceiver(int argc, char *argv[]);
 
 	/**
 	 * Destructor
@@ -77,29 +77,27 @@ class slsReceiver : private virtual slsReceiverDefs {
 	/**
 	 * Call back for raw data
 	 * args to raw data ready callback are
-	 * frameNumber is the frame number
-	 * expLength is the subframe number (32 bit eiger) or real time exposure time in 100ns (others)
-	 * packetNumber is the packet number
-	 * bunchId is the bunch id from beamline
-	 * timestamp is the time stamp with 10 MHz clock
-	 * modId is the unique module id (unique even for left, right, top, bottom)
-	 * xCoord is the x coordinate in the complete detector system
-	 * yCoord is the y coordinate in the complete detector system
-	 * zCoord is the z coordinate in the complete detector system
-	 * debug is for debugging purposes
-	 * roundRNumber is the round robin set number
-	 * detType is the detector type see :: detectorType
-	 * version is the version number of this structure format
+	 * sls_receiver_header frame metadata
 	 * dataPointer is the pointer to the data
-	 * dataSize in bytes is the size of the data in bytes
+	 * dataSize in bytes is the size of the data in bytes.
 	 */
-	void registerCallBackRawDataReady(void (*func)(uint64_t, uint32_t, uint32_t, uint64_t, uint64_t, uint16_t, uint16_t, uint16_t, uint16_t, uint32_t, uint16_t, uint8_t, uint8_t,
+	void registerCallBackRawDataReady(void (*func)(char* ,
 			char*, uint32_t, void*),void *arg);
+
+    /**
+     * Call back for raw data (modified)
+     * args to raw data ready callback are
+     * sls_receiver_header frame metadata
+     * dataPointer is the pointer to the data
+     * revDatasize is the reference of data size in bytes.
+     * Can be modified to the new size to be written/streamed. (only smaller value).
+     */
+    void registerCallBackRawDataModifyReady(void (*func)(char* ,
+            char*, uint32_t &,void*),void *arg);
 
 
 
  private:
 	slsReceiverTCPIPInterface* tcpipInterface;
-	UDPInterface* udp_interface;
 };
 

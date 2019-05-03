@@ -21,13 +21,11 @@ class File : private virtual slsReceiverDefs {
 	 * Constructor
 	 * creates the File Writer
 	 * @param ind self index
-	 * @param maxf max frames per file
-	 * @param ppf packets per frame
+	 * @param maxf pointer to max frames per file
 	 * @param nd pointer to number of detectors in each dimension
 	 * @param fname pointer to file name prefix
 	 * @param fpath pointer to file path
 	 * @param findex pointer to file index
-	 * @param frindexenable pointer to frame index enable
 	 * @param owenable pointer to over write enable
 	 * @param dindex pointer to detector index
 	 * @param nunits pointer to number of theads/ units per detector
@@ -36,9 +34,8 @@ class File : private virtual slsReceiverDefs {
 	 * @param portno pointer to udp port number for logging
 	 * @param smode pointer to silent mode
 	 */
-	File(int ind, uint32_t maxf, const uint32_t* ppf,
-			int* nd, char* fname, char* fpath, uint64_t* findex,
-			bool* frindexenable, bool* owenable,
+	File(int ind, uint32_t* maxf,
+			int* nd, char* fname, char* fpath, uint64_t* findex, bool* owenable,
 			int* dindex, int* nunits, uint64_t* nf, uint32_t* dr, uint32_t* portno,
 			bool* smode);
 
@@ -67,10 +64,10 @@ class File : private virtual slsReceiverDefs {
 	/**
 	 * Get Member Pointer Values before the object is destroyed
 	 * @param nd pointer to number of detectors in each dimension
+	 * @param maxf pointer to max frames per file
 	 * @param fname pointer to file name prefix
 	 * @param fpath pointer to file path
 	 * @param findex pointer to file index
-	 * @param frindexenable pointer to frame index enable
 	 * @param owenable pointer to over write enable
 	 * @param dindex pointer to detector index
 	 * @param nunits pointer to number of theads/ units per detector
@@ -78,21 +75,9 @@ class File : private virtual slsReceiverDefs {
 	 * @param dr pointer to dynamic range
 	 * @param portno pointer to dynamic range
 	 */
-	void GetMemberPointerValues(int* nd, char*& fname, char*& fpath, uint64_t*& findex,
-			bool*& frindexenable, bool*& owenable,
+	void GetMemberPointerValues(int* nd, uint32_t*& maxf, char*& fname, char*& fpath,
+			uint64_t*& findex, bool*& owenable,
 			int*& dindex, int*& nunits, uint64_t*& nf, uint32_t*& dr, uint32_t*& portno);
-
-	/**
-	 * Set Max frames per file
-	 * @param maxf maximum frames per file
-	 */
-	void SetMaxFramesPerFile(uint32_t maxf);
-
-	/**
-	 * Set Packets per frame (called only for each generalData construction)
-	 * @param ppf pointer to packets per frame
-	 */
-	void SetPacketsPerFrame(const uint32_t* ppf);
 
 	/**
 	 * Create file
@@ -100,7 +85,8 @@ class File : private virtual slsReceiverDefs {
 	 * @returns OK or FAIL
 	 */
 	virtual int CreateFile(uint64_t fnum){
-		cprintf(RED,"This is a generic function CreateFile that should be overloaded by a derived class\n");
+		cprintf(RED,"This is a generic function CreateFile that should be "
+				"overloaded by a derived class\n");
 		return OK;
 	}
 
@@ -108,14 +94,16 @@ class File : private virtual slsReceiverDefs {
 	 * Close Current File
 	 */
 	virtual void CloseCurrentFile() {
-		cprintf(RED,"This is a generic function CloseCurrentFile that should be overloaded by a derived class\n");
+		cprintf(RED,"This is a generic function CloseCurrentFile that should be "
+				"overloaded by a derived class\n");
 	}
 
 	/**
 	 * Close Files
 	 */
 	virtual void CloseAllFiles() {
-		cprintf(RED,"This is a generic function that should be overloaded by a derived class\n");
+		cprintf(RED,"This is a generic function that should be overloaded "
+				"by a derived class\n");
 	}
 
 	/**
@@ -126,7 +114,8 @@ class File : private virtual slsReceiverDefs {
 	 * @param OK or FAIL
 	 */
 	virtual int WriteToFile(char* buffer, int buffersize, uint64_t fnum, uint32_t nump) {
-		cprintf(RED,"This is a generic function WriteToFile that should be overloaded by a derived class\n");
+		cprintf(RED,"This is a generic function WriteToFile that "
+				"should be overloaded by a derived class\n");
 		return FAIL;
 	}
 
@@ -137,13 +126,16 @@ class File : private virtual slsReceiverDefs {
 	  * @param nx number of pixels in x direction
 	  * @param ny number of pixels in y direction
 	  * @param at acquisition time
-	  * @param at sub exposure time
+	  * @param st sub exposure time
+	  * @param sp sub period
 	  * @param ap acquisition period
 	  * @returns OK or FAIL
 	  */
 	virtual int CreateMasterFile(bool en, uint32_t size,
-				uint32_t nx, uint32_t ny, uint64_t at, uint64_t st, uint64_t ap) {
-		cprintf(RED,"This is a generic function CreateMasterFile that should be overloaded by a derived class\n");
+				uint32_t nx, uint32_t ny, uint64_t at, uint64_t st,
+				uint64_t sp, uint64_t ap) {
+		cprintf(RED,"This is a generic function CreateMasterFile that "
+				"should be overloaded by a derived class\n");
 		return OK;
 	}
 
@@ -154,15 +146,18 @@ class File : private virtual slsReceiverDefs {
 	 * @param ny number of pixels in y direction
 	 */
 	virtual void SetNumberofPixels(uint32_t nx, uint32_t ny) {
-		cprintf(RED,"This is a generic function SetNumberofPixels that should be overloaded by a derived class\n");
+		cprintf(RED,"This is a generic function SetNumberofPixels that "
+				"should be overloaded by a derived class\n");
 	}
 
 	/**
 	 * End of Acquisition
+	 * @param anyPacketsCaught true if any packets are caught, else false
 	 * @param numf number of images caught
 	 */
-	virtual void EndofAcquisition(uint64_t numf) {
-		cprintf(RED,"This is a generic function EndofAcquisition that should be overloaded by a derived class\n");
+	virtual void EndofAcquisition(bool anyPacketsCaught, uint64_t numf) {
+		cprintf(RED,"This is a generic function EndofAcquisition that "
+				"should be overloaded by a derived class\n");
 	}
 
  protected:
@@ -174,11 +169,7 @@ class File : private virtual slsReceiverDefs {
 	int index;
 
 	/** Maximum frames per file */
-	uint32_t maxFramesPerFile;
-
-	/** Packets per frame for logging */
-	//pointer because value in generalData could change
-	const uint32_t* packetsPerFrame;
+	uint32_t* maxFramesPerFile;
 
 	/** Master File Name */
 	std::string masterFileName;
@@ -201,9 +192,6 @@ class File : private virtual slsReceiverDefs {
 	/** File Index */
 	uint64_t* fileIndex;
 
-	/** Frame Index */
-	bool* frameIndexEnable;
-
 	/** Over write enable */
 	bool* overWriteEnable;
 
@@ -223,7 +211,7 @@ class File : private virtual slsReceiverDefs {
 	uint32_t* udpPortNumber;
 
 	/** Silent Mode */
-	bool silentMode;
+	bool* silentMode;
 
 };
 
