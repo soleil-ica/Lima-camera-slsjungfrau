@@ -12,8 +12,9 @@
 #include <sstream>
 #include <queue>
 #include <math.h>
+#include <semaphore.h>
 
-using namespace std;
+// 
 /**
    @short class handling the data file I/O flags
 */
@@ -30,7 +31,17 @@ class fileIO :  public fileIOStatic, public virtual slsDetectorBase  {
 
 
   /** default constructor */
-  fileIO(): fileIOStatic(){currentFrameIndex=-1;frameIndex=-1;detIndex=-1; framesPerFile=&nframes; nframes=1; filefd = NULL;};
+  fileIO(): fileIOStatic(){
+    currentFrameIndex=-1;
+    frameIndex=-1;
+    detIndex=-1; 
+    framesPerFile=&nframes; 
+    nframes=1; 
+    filefd = NULL;  
+    pthread_mutex_t mp1 = PTHREAD_MUTEX_INITIALIZER;
+    mf=mp1;
+    pthread_mutex_init(&mf, NULL); 
+  };
 
   /** virtual destructor */
   virtual ~fileIO(){};
@@ -39,65 +50,132 @@ class fileIO :  public fileIOStatic, public virtual slsDetectorBase  {
   using fileIOStatic::writeDataFile;
   using fileIOStatic::createFileName;
 
-  int getFileIndexFromFileName(string fname){return fileIOStatic::getFileIndexFromFileName(fname);};
-  int getIndicesFromFileName(string fname, int &index){return fileIOStatic::getIndicesFromFileName(fname,index);};
-  int getVariablesFromFileName(string fname, int &index, int &p_index, double &sv0, double &sv1){return fileIOStatic::getVariablesFromFileName(fname, index, p_index, sv0, sv1);};
-  int getVariablesFromFileName(string fname, int &index, int &f_index, int &p_index, double &sv0, double &sv1, int &detindex){return fileIOStatic::getVariablesFromFileName(fname, f_index, index, p_index, sv0, sv1, detindex);};
+  int getFileIndexFromFileName(std::string fname){
+    int ret; 
+    pthread_mutex_lock(&mf);
+    ret=fileIOStatic::getFileIndexFromFileName(fname);
+    pthread_mutex_unlock(&mf); 
+    return ret;
+  };
+  int getIndicesFromFileName(std::string fname, int &index){
+    int ret; 
+    pthread_mutex_lock(&mf);
+    ret=fileIOStatic::getIndicesFromFileName(fname,index);
+    pthread_mutex_unlock(&mf); 
+    return ret;
+  };
+
+
+
+  int getVariablesFromFileName(std::string fname, int &index, int &p_index, double &sv0, double &sv1){
+    
+    int ret; 
+    pthread_mutex_lock(&mf);
+    ret=fileIOStatic::getVariablesFromFileName(fname, index, p_index, sv0, sv1);
+    pthread_mutex_unlock(&mf); 
+    return ret;
+  };
+
+  int getVariablesFromFileName(std::string fname, int &index, int &f_index, int &p_index, double &sv0, double &sv1, int &detindex){
+
+    
+    int ret; 
+    pthread_mutex_lock(&mf);
+    ret=fileIOStatic::getVariablesFromFileName(fname, f_index, index, p_index, sv0, sv1, detindex);
+    pthread_mutex_unlock(&mf); 
+    return ret;
+  };
+
   /**
      sets the default output files path
      \param s file path
      \return actual file path
   */
-  virtual string setFilePath(string s) {sprintf(filePath, s.c_str()); return string(filePath);};
+  virtual std::string setFilePath(std::string s) {
+    pthread_mutex_lock(&mf);
+    sprintf(filePath, "%s", s.c_str()); 
+    pthread_mutex_unlock(&mf); 
+    return std::string(filePath);
+  };
 
   /**
      sets the default output files root name
      \param s file name to be set
      \returns actual file name
   */
-  virtual  string setFileName(string s) {sprintf(fileName, s.c_str()); return string(fileName);};
+  virtual  std::string setFileName(std::string s) {
+    pthread_mutex_lock(&mf);
+    sprintf(fileName, "%s", s.c_str()); 
+    pthread_mutex_unlock(&mf); 
+    return std::string(fileName);};
 
   /**
      sets the default output file index
      \param i start file index to be set
      \returns actual file index
   */
-  virtual int setFileIndex(int i) {*fileIndex=i; return *fileIndex;};
+  virtual int setFileIndex(int i) {
+    pthread_mutex_lock(&mf);
+    *fileIndex=i; 
+    pthread_mutex_unlock(&mf); 
+    return *fileIndex;
+  };
   
   /**
      sets the default output file frame index
      \param i file frame index to be set
      \returns actual file frame index
   */
-  virtual int setFrameIndex(int i) {frameIndex=i; return frameIndex;};
+  virtual int setFrameIndex(int i) {
+    pthread_mutex_lock(&mf);
+    frameIndex=i; 
+    pthread_mutex_unlock(&mf); 
+    return frameIndex;};
 
   /**
      sets the default output current frame index
      \param i current frame index to be set
      \returns actual current frame index
   */
-  virtual int setCurrentFrameIndex(int i) {currentFrameIndex=i; return currentFrameIndex;};
+  virtual int setCurrentFrameIndex(int i) {
+    pthread_mutex_lock(&mf);
+    currentFrameIndex=i; 
+    pthread_mutex_unlock(&mf); 
+    return currentFrameIndex;
+  };
 
   /**
      sets the default output file index
      \param i frame index to be set
      \returns actual frame index
   */
-  virtual int setFramesPerFile(int i) {if (i>0) *framesPerFile=i; return *framesPerFile;};
+  virtual int setFramesPerFile(int i) {
+    pthread_mutex_lock(&mf);
+    if (i>0) *framesPerFile=i;
+    pthread_mutex_unlock(&mf); 
+    return *framesPerFile;};
 
   /**
      sets the default output file index
      \param i detector index to be set
      \returns actual detector index
   */
-  virtual  int setDetectorIndex(int i) {detIndex=i;return detIndex;};
+  virtual  int setDetectorIndex(int i) {
+	  pthread_mutex_lock(&mf);
+	  detIndex=i;
+	  pthread_mutex_unlock(&mf);
+	  return detIndex;};
 
   /**
      sets the default file format
      \param i file format to be set
      \returns actual file frame format
   */
-  virtual fileFormat setFileFormat(int i) {*fileFormatType=(fileFormat)i; return *fileFormatType;};
+  virtual fileFormat setFileFormat(int i) {
+	  pthread_mutex_lock(&mf);
+	  *fileFormatType=(fileFormat)i;
+	  pthread_mutex_unlock(&mf);
+	  return *fileFormatType;  };
 
 
 
@@ -105,11 +183,11 @@ class fileIO :  public fileIOStatic, public virtual slsDetectorBase  {
      \returns the  output files path
      
   */
-  virtual string getFilePath() {return string(filePath);};
+  virtual std::string getFilePath() {return std::string(filePath);};
   /**
     \returns the  output files root name
   */
-  virtual string getFileName() {return string(fileName);};
+  virtual std::string getFileName() {return std::string(fileName);};
 
   /**
      \returns the output file index
@@ -142,9 +220,9 @@ class fileIO :  public fileIOStatic, public virtual slsDetectorBase  {
   virtual fileFormat getFileFormat() {return *fileFormatType;};
 
 
-  string createFileName();
+  std::string createFileName();
 
-  string createReceiverFilePrefix();
+  std::string createReceiverFilePrefix();
 
 
   /**
@@ -157,7 +235,7 @@ class fileIO :  public fileIOStatic, public virtual slsDetectorBase  {
   \param nch number of channels to be written to file. if -1 defaults to the number of installed channels of the detector
   \returns OK or FAIL if it could not write the file or data=NULL
   */
-   virtual int writeDataFile(string fname, double *data, double *err=NULL, double *ang=NULL, char dataformat='f', int nch=-1);
+   virtual int writeDataFile(std::string fname, double *data, double *err=NULL, double *ang=NULL, char dataformat='f', int nch=-1);
   
 
   /**
@@ -174,7 +252,7 @@ class fileIO :  public fileIOStatic, public virtual slsDetectorBase  {
   \returns OK or FAIL if it could not write the file or data=NULL
   
   */
-   virtual int writeDataFile(ofstream &outfile, double *data, double *err=NULL, double *ang=NULL, char dataformat='f', int nch=-1, int offset=0);
+   virtual int writeDataFile(std::ofstream &outfile, double *data, double *err=NULL, double *ang=NULL, char dataformat='f', int nch=-1, int offset=0);
   
 
    /**
@@ -183,7 +261,7 @@ class fileIO :  public fileIOStatic, public virtual slsDetectorBase  {
       \param data array of data values
       \returns OK or FAIL if it could not write the file or data=NULL  
   */
-  virtual int writeDataFile(string fname, int *data);
+  virtual int writeDataFile(std::string fname, int *data);
 
   
   virtual int writeDataFile(void *data, int iframe=-1);
@@ -196,7 +274,7 @@ class fileIO :  public fileIOStatic, public virtual slsDetectorBase  {
       \param offset start channel number
       \returns OK or FAIL if it could not write the file or data=NULL  
   */
-  virtual int writeDataFile(ofstream &outfile, int *data, int offset=0);
+  virtual int writeDataFile(std::ofstream &outfile, int *data, int offset=0);
   
 
 
@@ -206,7 +284,7 @@ class fileIO :  public fileIOStatic, public virtual slsDetectorBase  {
        \param data array of data values
        \returns OK or FAIL if it could not write the file or data=NULL
   */
-  virtual int writeDataFile(string fname, short int *data);    
+  virtual int writeDataFile(std::string fname, short int *data);    
   
 
 
@@ -221,7 +299,7 @@ class fileIO :  public fileIOStatic, public virtual slsDetectorBase  {
       \param offset start channel number
       \returns OK or FAIL if it could not write the file or data=NULL  
   */
-  virtual int writeDataFile(ofstream &outfile, short int *data, int offset=0);
+  virtual int writeDataFile(std::ofstream &outfile, short int *data, int offset=0);
 
 
   /**
@@ -234,7 +312,7 @@ class fileIO :  public fileIOStatic, public virtual slsDetectorBase  {
        \param dataformat format of the data: can be 'i' integer or 'f' double (default)
        \returns OK or FAIL if it could not read the file or data=NULL
   */
-  virtual int readDataFile(string fname, double *data, double *err=NULL, double *ang=NULL, char dataformat='f');
+  virtual int readDataFile(std::string fname, double *data, double *err=NULL, double *ang=NULL, char dataformat='f');
 
   /**
        reads a data file
@@ -246,7 +324,7 @@ class fileIO :  public fileIOStatic, public virtual slsDetectorBase  {
        \param offset start channel number to be expected
        \returns OK or FAIL if it could not read the file or data=NULL
   */
-  int readDataFile(ifstream& infile, double *data, double *err=NULL, double *ang=NULL, char dataformat='f', int offset=0);
+  int readDataFile(std::ifstream& infile, double *data, double *err=NULL, double *ang=NULL, char dataformat='f', int offset=0);
 
   /**
        reads a raw data file
@@ -254,7 +332,7 @@ class fileIO :  public fileIOStatic, public virtual slsDetectorBase  {
        \param data array of data values
        \returns OK or FAIL if it could not read the file or data=NULL
 yes  */
-  virtual int readDataFile(string fname, int *data);  
+  virtual int readDataFile(std::string fname, int *data);  
 
 /**
        reads a raw data file
@@ -263,7 +341,7 @@ yes  */
        \param offset first channel number to be expected
        \returns OK or FAIL if it could not read the file or data=NULL
   */
-  int readDataFile(ifstream &infile, int *data, int offset=0);
+  int readDataFile(std::ifstream &infile, int *data, int offset=0);
 
   /**
 
@@ -272,7 +350,7 @@ yes  */
        \param data array of data values
        \returns OK or FAIL if it could not read the file or data=NULL
   */
-  virtual int readDataFile(string fname, short int *data); 
+  virtual int readDataFile(std::string fname, short int *data); 
   /**
        reads a short int raw data file
        \param infile input file stream
@@ -280,12 +358,12 @@ yes  */
        \param offset first channel number to be expected
        \returns OK or FAIL if it could not read the file or data=NULL
   */
-  int readDataFile(ifstream &infile, short int *data, int offset=0);
+  int readDataFile(std::ifstream &infile, short int *data, int offset=0);
 
   virtual int getDataBytes   (   )=0;
   friend class slsDetector;
 
-  string getCurrentFileName(){return currentFileName;};
+  std::string getCurrentFileName(){return currentFileName;};
  protected:
 
 
@@ -298,12 +376,12 @@ yes  */
   void incrementDetectorIndex() { (detIndex)++; };
 
 
-  string getCurrentReceiverFilePrefix(){return currentReceiverFilePrefix;};
+  std::string getCurrentReceiverFilePrefix(){return currentReceiverFilePrefix;};
 
 
-  string currentFileName;
+  std::string currentFileName;
 
-  string currentReceiverFilePrefix;
+  std::string currentReceiverFilePrefix;
 
     
   /** output directory */
@@ -327,7 +405,7 @@ yes  */
 
 
   FILE *filefd;
-  ofstream fstream;
+  std::ofstream fstream;
 
   int nframes;
   // int fformat;
@@ -335,6 +413,8 @@ yes  */
 
   int nBytes;
 
+ /** mutex to synchronize read/write fname */
+   pthread_mutex_t mf;
 };
 
 #endif

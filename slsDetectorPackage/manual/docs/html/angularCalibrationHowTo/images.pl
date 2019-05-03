@@ -1,4 +1,4 @@
-# LaTeX2HTML 2008 (1.71)
+# LaTeX2HTML 2012 (1.2)
 # Associate images original text with physical files.
 
 
@@ -44,17 +44,17 @@ $cached_env_img{$key} = q|<IMG
  SRC="|."$dir".q|img9.png"
  ALT="$p=50&nbsp;\mu m$">|; 
 
-$key = q/_6;MSF=1.6;AAT/;
-$cached_env_img{$key} = q|<IMG
- WIDTH="12" HEIGHT="30" ALIGN="MIDDLE" BORDER="0"
- SRC="|."$dir".q|img10.png"
- ALT="$_6$">|; 
-
 $key = q/C_{peak};MSF=1.6;AAT/;
 $cached_env_img{$key} = q|<IMG
  WIDTH="43" HEIGHT="30" ALIGN="MIDDLE" BORDER="0"
  SRC="|."$dir".q|img2.png"
  ALT="$C_{peak}$">|; 
+
+$key = q/_6;MSF=1.6;AAT/;
+$cached_env_img{$key} = q|<IMG
+ WIDTH="12" HEIGHT="30" ALIGN="MIDDLE" BORDER="0"
+ SRC="|."$dir".q|img10.png"
+ ALT="$_6$">|; 
 
 $key = q/includegraphics[width=textwidth]{peakFit.eps};AAT/;
 $cached_env_img{$key} = q|<IMG
@@ -74,17 +74,17 @@ $cached_env_img{$key} = q|<IMG
  SRC="|."$dir".q|img16.png"
  ALT="\includegraphics[width=\textwidth]{setupAngcal.eps}">|; 
 
-$key = q/pm;MSF=1.6;AAT/;
-$cached_env_img{$key} = q|<IMG
- WIDTH="17" HEIGHT="30" ALIGN="MIDDLE" BORDER="0"
- SRC="|."$dir".q|img12.png"
- ALT="$\pm$">|; 
-
 $key = q/includegraphics[width=textwidth]{angleFit.eps};AAT/;
 $cached_env_img{$key} = q|<IMG
  WIDTH="555" HEIGHT="707" ALIGN="BOTTOM" BORDER="0"
  SRC="|."$dir".q|img18.png"
  ALT="\includegraphics[width=\textwidth]{angleFit.eps}">|; 
+
+$key = q/pm;MSF=1.6;AAT/;
+$cached_env_img{$key} = q|<IMG
+ WIDTH="17" HEIGHT="30" ALIGN="MIDDLE" BORDER="0"
+ SRC="|."$dir".q|img12.png"
+ ALT="$\pm$">|; 
 
 $key = q/{displaymath}Theta_e=Theta_o^i-arctanBig(frac{pcdot(C_{peak}-C_{center}^i)}{R^i}Big),{displaymath};MSF=1.6;AAT/;
 $cached_env_img{$key} = q|<IMG
@@ -96,13 +96,13 @@ $cached_env_img{$key} = q|<IMG
 
 $key = q/theta;MSF=1.6;AAT/;
 $cached_env_img{$key} = q|<IMG
- WIDTH="12" HEIGHT="14" ALIGN="BOTTOM" BORDER="0"
+ WIDTH="12" HEIGHT="15" ALIGN="BOTTOM" BORDER="0"
  SRC="|."$dir".q|img1.png"
  ALT="$\theta$">|; 
 
 $key = q/R^i;MSF=1.6;AAT/;
 $cached_env_img{$key} = q|<IMG
- WIDTH="22" HEIGHT="16" ALIGN="BOTTOM" BORDER="0"
+ WIDTH="22" HEIGHT="17" ALIGN="BOTTOM" BORDER="0"
  SRC="|."$dir".q|img8.png"
  ALT="$R^i$">|; 
 

@@ -10,6 +10,9 @@
 #include "sls_receiver_defs.h"
 #include "receiver_defs.h"
 
+#include <math.h>			//ceil
+#include <vector>
+
 
 class GeneralData {
 	
@@ -70,14 +73,19 @@ public:
 	uint32_t headerPacketSize;
 
 	/** Streaming (for ROI - mainly short Gotthard) - Number of Pixels in x axis */
-	uint32_t nPixelsX_Streamer;
+	uint32_t nPixelsXComplete;
 
 	/** Streaming (for ROI - mainly short Gotthard) - Number of Pixels in y axis */
-	uint32_t nPixelsY_Streamer;
+	uint32_t nPixelsYComplete;
 
 	/** Streaming (for ROI - mainly short Gotthard) - Image size (in bytes) */
-	uint32_t imageSize_Streamer;
+	uint32_t imageSizeComplete;
 
+	/** if standard header implemented in firmware */
+	bool standardheader;
+
+	/** default udp socket buffer size */
+	uint32_t defaultUdpSocketBufferSize;
 
 
 
@@ -101,9 +109,11 @@ public:
 		defaultFifoDepth(0),
 		threadsPerReceiver(1),
 		headerPacketSize(0),
-		nPixelsX_Streamer(0),
-		nPixelsY_Streamer(0),
-		imageSize_Streamer(0)
+		nPixelsXComplete(0),
+		nPixelsYComplete(0),
+		imageSizeComplete(0),
+		standardheader(false),
+		defaultUdpSocketBufferSize(RECEIVE_SOCKET_BUFFER_SIZE)
 		{};
 
 	/** Destructor */
@@ -113,28 +123,14 @@ public:
 	 * Get Header Infomation (frame number, packet number)
 	 * @param index thread index for debugging purposes
 	 * @param packetData pointer to data
-	 * @param frameNumber frame number
-	 * @param packetNumber packet number
-	 */
-	virtual void GetHeaderInfo(int index, char* packetData,	uint64_t& frameNumber, uint32_t& packetNumber) const
-	{
-		frameNumber = ((uint32_t)(*((uint32_t*)(packetData))));
-		frameNumber++;
-		packetNumber = frameNumber&packetIndexMask;
-		frameNumber = (frameNumber & frameIndexMask) >> frameIndexOffset;
-	}
-
-	/**
-	 * Get Header Infomation (frame number, packet number)
-	 * @param index thread index for debugging purposes
-	 * @param packetData pointer to data
 	 * @param dynamicRange dynamic range to assign subframenumber if 32 bit mode
+	 * @param oddStartingPacket odd starting packet (gotthard)
 	 * @param frameNumber frame number
 	 * @param packetNumber packet number
 	 * @param subFrameNumber sub frame number if applicable
 	 * @param bunchId bunch id
 	 */
-	virtual void GetHeaderInfo(int index, char* packetData, uint32_t dynamicRange,
+	virtual void GetHeaderInfo(int index, char* packetData, uint32_t dynamicRange, bool oddStartingPacket,
 			uint64_t& frameNumber, uint32_t& packetNumber, uint32_t& subFrameNumber, uint64_t& bunchId) const
 	{
 		subFrameNumber = -1;
@@ -144,6 +140,25 @@ public:
 		packetNumber = frameNumber&packetIndexMask;
 		frameNumber = (frameNumber & frameIndexMask) >> frameIndexOffset;
 	}
+
+	/**
+	 * Set ROI
+	 * @param i ROI
+	 */
+	virtual void SetROI(std::vector<slsReceiverDefs::ROI> i) {
+		cprintf(RED,"This is a generic function that should be overloaded by a derived class\n");
+	};
+
+	/**
+	 * Get Adc configured
+	 * @param index thread index for debugging purposes
+	 * @param i pointer to a vector of ROI pointers
+	 * @returns adc configured
+	 */
+	virtual int GetAdcConfigured(int index, std::vector<slsReceiverDefs::ROI>* i)  const{
+		cprintf(RED,"This is a generic function that should be overloaded by a derived class\n");
+		return 0;
+	};
 
 	/**
 	 * Setting dynamic range changes member variables
@@ -162,6 +177,35 @@ public:
 	virtual void SetTenGigaEnable(bool tgEnable, int dr) {
 		cprintf(RED,"This is a generic function that should be overloaded by a derived class\n");
 	};
+
+	/**
+	 * Setting packets per frame changes member variables
+	 * @param ns number of samples
+	 * @param nroich number of channels in roi
+	 */
+	virtual void setNumberofSamples(const uint64_t ns, uint32_t nroich) {
+		cprintf(RED,"This is a generic function that should be overloaded by a derived class\n");
+	};
+
+	/**
+	 * Enable Gap Pixels changes member variables
+	 * @param enable true if gap pixels enable, else false
+	 */
+	virtual void SetGapPixelsEnable(bool b, int dr) {
+		cprintf(RED,"This is a generic function that should be overloaded by a derived class\n");
+	};
+
+	/**
+	 * Set odd starting packet (gotthard)
+	 * @param index thread index for debugging purposes
+	 * @param packetData pointer to data
+	 * @returns true or false for odd starting packet number
+	 */
+	virtual bool SetOddStartingPacket(int index, char* packetData) {
+	    cprintf(RED,"This is a generic function that should be overloaded by a derived class\n");
+	    return false;
+	};
+
 
 	/**
 	 * Print all variables
@@ -186,15 +230,21 @@ public:
 		FILE_LOG(logDEBUG) << "Default Fifo Depth: " << defaultFifoDepth;
 		FILE_LOG(logDEBUG) << "Threads Per Receiver: " << threadsPerReceiver;
 		FILE_LOG(logDEBUG) << "Header Packet Size: " << headerPacketSize;
-		FILE_LOG(logDEBUG) << "Streamer Pixels X: " << nPixelsX_Streamer;
-		FILE_LOG(logDEBUG) << "Streamer Pixels Y: " << nPixelsY_Streamer;
-		FILE_LOG(logDEBUG) << "Streamer Image Size: " << imageSize_Streamer;
+		FILE_LOG(logDEBUG) << "Complete Pixels X: " << nPixelsXComplete;
+		FILE_LOG(logDEBUG) << "Complete Pixels Y: " << nPixelsYComplete;
+		FILE_LOG(logDEBUG) << "Complete Image Size: " << imageSizeComplete;
+		FILE_LOG(logDEBUG) << "Standard Header: " << standardheader;
+		FILE_LOG(logDEBUG) << "UDP Socket Buffer Size: " << defaultUdpSocketBufferSize;
 	};
 };
 
 
 class GotthardData : public GeneralData {
 
+private:
+	const static int nChip = 10;
+	const static int nChan = 128;
+	const static int nChipsPerAdc = 2;
  public:
 
 	/** Constructor */
@@ -211,69 +261,150 @@ class GotthardData : public GeneralData {
 		frameIndexOffset 	= 1;
 		packetIndexMask 	= 1;
 		maxFramesPerFile 	= MAX_FRAMES_PER_FILE;
-		fifoBufferHeaderSize= FIFO_HEADER_NUMBYTES + sizeof(slsReceiverDefs::sls_detector_header);
+		fifoBufferHeaderSize= FIFO_HEADER_NUMBYTES + sizeof(slsReceiverDefs::sls_receiver_header);
 		defaultFifoDepth 	= 50000;
-		nPixelsX_Streamer 	= nPixelsX;
-		nPixelsY_Streamer 	= nPixelsY;
-		imageSize_Streamer 	= imageSize;
-	};
-};
-
-
-class ShortGotthardData : public GeneralData {
-
- public:
-
-	/** Constructor */
-	ShortGotthardData(){
-		myDetectorType		= slsReceiverDefs::GOTTHARD;
-		nPixelsX 			= 256;
-		nPixelsY 			= 1;
-		headerSizeinPacket  = 4;
-		dataSize 			= 512;
-		packetSize 			= 518;
-		packetsPerFrame 	= 1;
-		imageSize 			= dataSize*packetsPerFrame;
-		frameIndexMask 		= 0xFFFFFFFF;
-		maxFramesPerFile 	= SHORT_MAX_FRAMES_PER_FILE;
-		fifoBufferHeaderSize= FIFO_HEADER_NUMBYTES + sizeof(slsReceiverDefs::sls_detector_header);
-		defaultFifoDepth 	= 50000;
-		nPixelsX_Streamer 	= 1280;
-		nPixelsY_Streamer 	= 1;
-		imageSize_Streamer 	= 1280 * 2;
 	};
 
-	/**
-	 * Get Header Infomation (frame number, packet number)
-	 * @param index thread index for debugging purposes
-	 * @param packetData pointer to data
-	 * @param frameNumber frame number
-	 * @param packetNumber packet number
-	 */
-	virtual void GetHeaderInfo(int index, char* packetData,	uint64_t& frameNumber, uint32_t& packetNumber) const
-	{
-		frameNumber = ((uint32_t)(*((uint32_t*)(packetData))));
-		packetNumber = 0;
-	}
 
 	/**
 	 * Get Header Infomation (frame number, packet number)
 	 * @param index thread index for debugging purposes
 	 * @param packetData pointer to data
 	 * @param dynamicRange dynamic range to assign subframenumber if 32 bit mode
+	 * @param oddStartingPacket odd starting packet (gotthard)
 	 * @param frameNumber frame number
 	 * @param packetNumber packet number
 	 * @param subFrameNumber sub frame number if applicable
 	 * @param bunchId bunch id
 	 */
-	virtual void GetHeaderInfo(int index, char* packetData, uint32_t dynamicRange,
+	void GetHeaderInfo(int index, char* packetData, uint32_t dynamicRange, bool oddStartingPacket,
 			uint64_t& frameNumber, uint32_t& packetNumber, uint32_t& subFrameNumber, uint64_t& bunchId) const
 	{
-		subFrameNumber = -1;
-		bunchId = -1;
-		frameNumber = ((uint32_t)(*((uint32_t*)(packetData))));
-		packetNumber = 0;
+		if (nPixelsX == 1280) {
+			subFrameNumber = -1;
+			bunchId = -1;
+			frameNumber = ((uint32_t)(*((uint32_t*)(packetData))));
+			if (oddStartingPacket)
+			    frameNumber++;
+			packetNumber = frameNumber&packetIndexMask;
+			frameNumber = (frameNumber & frameIndexMask) >> frameIndexOffset;
+		} else  {
+			subFrameNumber = -1;
+			bunchId = -1;
+			frameNumber = ((uint32_t)(*((uint32_t*)(packetData))));
+			packetNumber = 0;
+		}
 	}
+
+
+	/**
+	 * Set ROI
+	 * @param i ROI
+	 */
+	void SetROI(std::vector<slsReceiverDefs::ROI> i) {
+		// all adcs
+		if(!i.size()) {
+			nPixelsX 			= 1280;
+			dataSize 			= 1280;
+			packetSize 			= GOTTHARD_PACKET_SIZE;
+			packetsPerFrame 	= 2;
+			imageSize 			= dataSize*packetsPerFrame;
+			frameIndexMask 		= 0xFFFFFFFE;
+			frameIndexOffset 	= 1;
+			packetIndexMask 	= 1;
+			maxFramesPerFile 	= MAX_FRAMES_PER_FILE;
+			fifoBufferHeaderSize= FIFO_HEADER_NUMBYTES + sizeof(slsReceiverDefs::sls_receiver_header);
+			defaultFifoDepth 	= 50000;
+			nPixelsXComplete 	= 0;
+			nPixelsYComplete 	= 0;
+			imageSizeComplete 	= 0;
+		}
+
+		// single adc
+		else  {
+			nPixelsX 			= 256;
+			dataSize 			= 512;
+			packetSize 			= 518;
+			packetsPerFrame 	= 1;
+			imageSize 			= dataSize*packetsPerFrame;
+			frameIndexMask 		= 0xFFFFFFFF;
+			frameIndexOffset 	= 0;
+			packetIndexMask 	= 0;
+			maxFramesPerFile 	= SHORT_MAX_FRAMES_PER_FILE;
+			fifoBufferHeaderSize= FIFO_HEADER_NUMBYTES + sizeof(slsReceiverDefs::sls_receiver_header);
+			defaultFifoDepth 	= 25000;
+			nPixelsXComplete 	= 1280;
+			nPixelsYComplete 	= 1;
+			imageSizeComplete 	= 1280 * 2;
+		}
+	};
+
+	/**
+	 * Get Adc configured
+	 * @param index thread index for debugging purposes
+	 * @param i pointer to a vector of ROI
+	 * @returns adc configured
+	 */
+	int GetAdcConfigured(int index, std::vector<slsReceiverDefs::ROI>* i)  const{
+		int adc = -1;
+		// single adc
+		if(i->size())  {
+			// gotthard can have only one adc per detector enabled (or all)
+			// so just looking at the first roi is enough (more not possible at the moment)
+
+			//if its for 1 adc or general
+			if ((i->at(0).xmin == 0) && (i->at(0).xmax == nChip * nChan))
+				adc = -1;
+			else {
+				//adc = mid value/numchans also for only 1 roi
+				adc = ((((i->at(0).xmax) + (i->at(0).xmin))/2)/
+						(nChan * nChipsPerAdc));
+				if((adc < 0) || (adc > 4)) {
+					FILE_LOG(logWARNING) << index << ": Deleting ROI. "
+							"Adc value should be between 0 and 4";
+					adc = -1;
+				}
+			}
+		}
+		FILE_LOG(logINFO) << "Adc Configured: " << adc;
+		return adc;
+	};
+
+    /**
+     * Set odd starting packet (gotthard)
+     * @param index thread index for debugging purposes
+     * @param packetData pointer to data
+     * @returns true or false for odd starting packet number
+     */
+	bool SetOddStartingPacket(int index, char* packetData) {
+	    bool oddStartingPacket = true;
+        // care only if no roi
+        if  (nPixelsX == 1280) {
+            uint32_t fnum = ((uint32_t)(*((uint32_t*)(packetData))));
+            uint32_t firstData = ((uint32_t)(*((uint32_t*)(packetData + 4))));
+            // first packet
+            if (firstData == 0xCACACACA) {
+                // packet number should be 0, but is 1 => so odd starting packet
+                if (fnum & packetIndexMask) {
+                    oddStartingPacket = true;
+                } else {
+                    oddStartingPacket = false;
+                }
+            }
+            // second packet
+            else {
+                // packet number should be 1, but is 0 => so odd starting packet
+                if (!(fnum & packetIndexMask)) {
+                    oddStartingPacket = true;
+                } else {
+                    oddStartingPacket = false;
+                }
+            }
+        }
+        return oddStartingPacket;
+    };
+
+
 };
 
 
@@ -300,11 +431,8 @@ class PropixData : public GeneralData {
 		frameIndexOffset 	= 1;
 		packetIndexMask 	= 1;
 		maxFramesPerFile 	= MAX_FRAMES_PER_FILE;
-		fifoBufferHeaderSize= FIFO_HEADER_NUMBYTES + sizeof(slsReceiverDefs::sls_detector_header);
+		fifoBufferHeaderSize= FIFO_HEADER_NUMBYTES + sizeof(slsReceiverDefs::sls_receiver_header);
 		defaultFifoDepth 	= 50000;
-		nPixelsX_Streamer 	= nPixelsX;
-		nPixelsY_Streamer 	= nPixelsY;
-		imageSize_Streamer 	= imageSize;
 	};
 };
 
@@ -330,11 +458,8 @@ class Moench02Data : public GeneralData {
 		frameIndexOffset 	= 8;
 		packetIndexMask 	= 0xFF;
 		maxFramesPerFile 	= MOENCH_MAX_FRAMES_PER_FILE;
-		fifoBufferHeaderSize= FIFO_HEADER_NUMBYTES + sizeof(slsReceiverDefs::sls_detector_header);
+		fifoBufferHeaderSize= FIFO_HEADER_NUMBYTES + sizeof(slsReceiverDefs::sls_receiver_header);
 		defaultFifoDepth 	= 2500;
-		nPixelsX_Streamer 	= nPixelsX;
-		nPixelsY_Streamer 	= nPixelsY;
-		imageSize_Streamer 	= imageSize;
 	};
 
 	/**
@@ -365,18 +490,28 @@ class Moench03Data : public GeneralData {
 		frameIndexOffset 	= (6+8);
 		packetIndexMask 	= 0xFFFFFFFF;
 		maxFramesPerFile 	= JFRAU_MAX_FRAMES_PER_FILE;
-		fifoBufferHeaderSize= FIFO_HEADER_NUMBYTES + sizeof(slsReceiverDefs::sls_detector_header);
+		fifoBufferHeaderSize= FIFO_HEADER_NUMBYTES + sizeof(slsReceiverDefs::sls_receiver_header);
 		defaultFifoDepth 	= 2500;
-		nPixelsX_Streamer 	= nPixelsX;
-		nPixelsY_Streamer 	= nPixelsY;
-		imageSize_Streamer 	= imageSize;
 	};
 };
 
 
 class JCTBData : public GeneralData {
 
+
+private:
+	/** Structure of an jungfrau ctb packet header */
+	typedef struct {
+		unsigned char emptyHeader[6];
+		unsigned char reserved[4];
+		unsigned char packetNumber[1];
+		unsigned char frameNumber[3];
+		unsigned char bunchid[8];
+	} jfrauctb_packet_header_t;
+
  public:
+
+
 
 	/** Bytes Per Adc */
 	const static uint32_t bytesPerAdc = 2;
@@ -384,19 +519,48 @@ class JCTBData : public GeneralData {
 	/** Constructor */
 	JCTBData(){
 		myDetectorType		= slsReceiverDefs::JUNGFRAUCTB;
-		nPixelsX 			= 32;
-		nPixelsY 			= 128;
+		nPixelsX 			= 400;
+		nPixelsY 			= 400;
 		headerSizeinPacket  = 22;
 		dataSize 			= 8192;
 		packetSize 			= headerSizeinPacket + dataSize;
 		packetsPerFrame 	= 1;
-		imageSize 			= dataSize*packetsPerFrame;
+		imageSize 			= nPixelsX * nPixelsY * 2;
+		frameIndexMask 		= 0xFFFFFF;
 		maxFramesPerFile 	= JFCTB_MAX_FRAMES_PER_FILE;
-		fifoBufferHeaderSize= FIFO_HEADER_NUMBYTES + sizeof(slsReceiverDefs::sls_detector_header);
+		fifoBufferHeaderSize= FIFO_HEADER_NUMBYTES + sizeof(slsReceiverDefs::sls_receiver_header);
 		defaultFifoDepth 	= 2500;
-		nPixelsX_Streamer 	= nPixelsX;
-		nPixelsY_Streamer 	= nPixelsY;
-		imageSize_Streamer 	= imageSize;
+	};
+
+
+	/**
+	 * Get Header Infomation (frame number, packet number)
+	 * @param index thread index for debugging purposes
+	 * @param packetData pointer to data
+	 * @param dynamicRange dynamic range to assign subframenumber if 32 bit mode
+	 * @param oddStartingPacket odd starting packet (gotthard)
+	 * @param frameNumber frame number 	 * @param packetNumber packet number
+	 * @param subFrameNumber sub frame number if applicable
+	 * @param bunchId bunch id
+	 */
+	void GetHeaderInfo(int index, char* packetData, uint32_t dynamicRange, bool oddStartingPacket,
+			uint64_t& frameNumber, uint32_t& packetNumber, uint32_t& subFrameNumber, uint64_t& bunchId) const 	{
+		subFrameNumber = -1;
+		jfrauctb_packet_header_t* header = (jfrauctb_packet_header_t*)(packetData);
+		frameNumber = (uint64_t)((*( (uint32_t*) header->frameNumber)) & frameIndexMask);
+		packetNumber = (uint32_t)(*( (uint8_t*) header->packetNumber));
+		bunchId = (*((uint64_t*) header->bunchid));
+	}
+
+	/**
+	 * Setting packets per frame changes member variables
+	 * @param ns number of samples
+	 * @param nroich number of channels in roi
+	 */
+	void setNumberofSamples(const uint64_t ns, uint32_t nroich) {
+		packetsPerFrame = ceil(double(2 * (nroich ? nroich : 32) * ns) / dataSize);
+		nPixelsY		= (ns * 2) / 25;/* depends on nroich also?? */
+		imageSize 		= nPixelsX * nPixelsY * 2;
 	};
 
 	/**
@@ -425,12 +589,10 @@ class JungfrauData : public GeneralData {
 		packetsPerFrame 	= 128;
 		imageSize 			= dataSize*packetsPerFrame;
 		maxFramesPerFile 	= JFRAU_MAX_FRAMES_PER_FILE;
-		fifoBufferHeaderSize= FIFO_HEADER_NUMBYTES + sizeof(slsReceiverDefs::sls_detector_header);
+		fifoBufferHeaderSize= FIFO_HEADER_NUMBYTES + sizeof(slsReceiverDefs::sls_receiver_header);
 		defaultFifoDepth 	= 2500;
-		nPixelsX_Streamer 	= nPixelsX;
-		nPixelsY_Streamer 	= nPixelsY;
-		imageSize_Streamer 	= imageSize;
-
+		standardheader		= true;
+		defaultUdpSocketBufferSize = (2000 * 1024 * 1024);
 	};
 
 };
@@ -451,13 +613,11 @@ class EigerData : public GeneralData {
 		packetsPerFrame 	= 256;
 		imageSize 			= dataSize*packetsPerFrame;
 		maxFramesPerFile 	= EIGER_MAX_FRAMES_PER_FILE;
-		fifoBufferHeaderSize= FIFO_HEADER_NUMBYTES + sizeof(slsReceiverDefs::sls_detector_header);
+		fifoBufferHeaderSize= FIFO_HEADER_NUMBYTES + sizeof(slsReceiverDefs::sls_receiver_header);
 		defaultFifoDepth 	= 100;
 		threadsPerReceiver	= 2;
 		headerPacketSize	= 40;
-		nPixelsX_Streamer 	= nPixelsX;
-		nPixelsY_Streamer 	= nPixelsY;
-		imageSize_Streamer 	= imageSize;
+		standardheader		= true;
 	};
 
 	/**
@@ -480,6 +640,34 @@ class EigerData : public GeneralData {
 		packetSize 		= headerSizeinPacket + dataSize;
 		packetsPerFrame = (tgEnable ? 4 : 16) * dr;
 		imageSize 		= dataSize*packetsPerFrame;
+	};
+
+	/**
+	 * Enable Gap Pixels changes member variables
+	 * @param enable true if gap pixels enable, else false
+	 * @param dr dynamic range
+	 */
+	void SetGapPixelsEnable(bool b, int dr) {
+		if (dr == 4)
+			b = 0;
+		switch((int)b) {
+		case 1:
+			nPixelsX	= (256 * 2) + 3;
+			nPixelsY 	= 256 + 1;
+			imageSize	= nPixelsX * nPixelsY * ((dr > 16) ? 4 : // 32 bit
+												((dr > 8)  ? 2 : // 16 bit
+												((dr > 4)  ? 1 : // 8 bit
+												0.5)));			 // 4 bit
+			break;
+		default:
+			nPixelsX 	= (256*2);
+			nPixelsY 	= 256;
+			imageSize	= nPixelsX * nPixelsY * ((dr > 16) ? 4 : // 32 bit
+												((dr > 8)  ? 2 : // 16 bit
+												((dr > 4)  ? 1 : // 8 bit
+												0.5)));			 // 4 bit
+			break;
+		}
 	};
 
 

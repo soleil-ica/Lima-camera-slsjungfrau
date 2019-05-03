@@ -22,7 +22,7 @@ enum recFuncs{
 	F_SEND_RECEIVER_DETHOSTNAME,	/**< set detector hostname to receiver */
 
 	//network functions
-	F_RECEIVER_SHORT_FRAME, 		/**< Sets receiver to receive short frames */
+	F_RECEIVER_SET_ROI, 			/**< Sets receiver ROI */
 	F_SETUP_RECEIVER_UDP,			/**< sets the receiver udp connection and returns receiver mac address */
 
 	//Acquisition setup functions
@@ -35,13 +35,11 @@ enum recFuncs{
 	F_START_RECEIVER,				/**< starts the receiver listening mode */
 	F_STOP_RECEIVER,				/**< stops the receiver listening mode */
 	F_START_RECEIVER_READOUT, 		/**< acquisition has stopped. start remaining readout in receiver */
-	F_READ_RECEIVER_FRAME,  		/**< read one frame to gui*/
 
 	//file functions
 	F_SET_RECEIVER_FILE_PATH, 		/**< sets receiver file directory */
 	F_SET_RECEIVER_FILE_NAME, 		/**< sets receiver file name */
 	F_SET_RECEIVER_FILE_INDEX, 		/**< sets receiver file index */
-	F_SET_RECEIVER_FRAME_INDEX,		/**< sets the receiver frame index */
 	F_GET_RECEIVER_FRAME_INDEX,		/**< gets the receiver frame index */
 	F_GET_RECEIVER_FRAMES_CAUGHT,	/**< gets the number of frames caught by receiver */
 	F_RESET_RECEIVER_FRAMES_CAUGHT, /**< resets the frames caught by receiver */
@@ -61,9 +59,18 @@ enum recFuncs{
 	F_SEND_RECEIVER_DETPOSID,		/** < sets the detector position id in the reveiver */
 	F_SEND_RECEIVER_MULTIDETSIZE,    /** < sets the multi detector size to the receiver */
 	F_SET_RECEIVER_STREAMING_PORT, 	/** < sets the receiver streaming port */
-
+	F_RECEIVER_STREAMING_SRC_IP,	/** < sets the receiver streaming source IP */
 	F_SET_RECEIVER_SILENT_MODE,		/** < sets the receiver silent mode */
+	F_ENABLE_GAPPIXELS_IN_RECEIVER,	/** < sets gap pixels in the receiver */
 	F_RESTREAM_STOP_FROM_RECEIVER,	/** < restream stop from receiver */
+	F_ADDITIONAL_JSON_HEADER,       /** < additional json header */
+	F_RECEIVER_UDP_SOCK_BUF_SIZE,   /** < UDP socket buffer size */
+    F_RECEIVER_REAL_UDP_SOCK_BUF_SIZE,   /** < real UDP socket buffer size */
+	F_SET_RECEIVER_FRAMES_PER_FILE, /** < receiver frames per file */
+	F_RECEIVER_CHECK_VERSION,		/** < check receiver version compatibility */
+	F_RECEIVER_DISCARD_POLICY,		/** < frames discard policy */
+	F_RECEIVER_PADDING_ENABLE,		/** < partial frames padding enable */
+	F_RECEIVER_DEACTIVATED_PADDING_ENABLE, /** < deactivated receiver padding enable */
 	/* Always append functions hereafter!!! */
 
 

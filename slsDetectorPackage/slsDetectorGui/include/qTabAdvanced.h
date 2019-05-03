@@ -158,6 +158,14 @@ private slots:
 	 */
 	void SetNetworkParameters();
 
+	/** Sets client zmq ip to listen to
+	 */
+	void SetClientZMQIP();
+
+	/** Sets receiver zmq ip to stream from
+	 */
+	void SetReceiverZMQIP();
+
 	/** Sets the receiver. which also sets the receiver parameters
 	 */
 	void SetReceiver();
@@ -189,6 +197,16 @@ private slots:
 	/** Set all trimbits to a value
 	 */
 	void SetAllTrimbits();
+
+	/** Set storage cells */
+	void SetNumStoragecells(int value);
+
+	/** Set sub frame exposure time */
+	void SetSubExposureTime();
+
+	/** Set sub frame period */
+	void SetSubPeriod();
+
 
 private:
 	/** The multi detector object */
@@ -234,7 +252,11 @@ private:
 	vector <QSpinBox*> 	spinToY;
 	int numRois;
 
+	/** sub period tool tip variables*/
+	QString 	acqSubPeriodTip;
+	QString 	errSubPeriodTip;
 
+	void CheckAcqPeriodGreaterThanExp();
 
 
 };

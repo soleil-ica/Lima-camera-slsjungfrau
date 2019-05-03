@@ -37,11 +37,13 @@ unsigned int Feb_Control_acquireNReadoutMode; //safe or parallel, half or full s
 unsigned int Feb_Control_triggerMode;         //internal timer, external start, external window, signal polarity (external trigger and enable)
 unsigned int Feb_Control_externalEnableMode;  //external enabling engaged and it's polarity
 unsigned int Feb_Control_subFrameMode;
+unsigned int Feb_Control_softwareTrigger;
 
 
 unsigned int Feb_Control_nimages;
 double Feb_Control_exposure_time_in_sec;
 int64_t Feb_Control_subframe_exposure_time_in_10nsec;
+int64_t Feb_Control_subframe_period_in_10nsec;
 double Feb_Control_exposure_period_in_sec;
 
 int64_t Feb_Control_RateTable_Tau_in_nsec = -1;
@@ -1380,6 +1382,14 @@ int Feb_Control_SetSubFrameExposureTime(int64_t the_subframe_exposure_time_in_10
 }
 int64_t Feb_Control_GetSubFrameExposureTime(){return Feb_Control_subframe_exposure_time_in_10nsec*10;}
 
+int Feb_Control_SetSubFramePeriod(int64_t the_subframe_period_in_10nsec){
+	Feb_Control_subframe_period_in_10nsec = the_subframe_period_in_10nsec;
+	printf("Sub Frame Period set to: %lld\n",(long long int)Feb_Control_subframe_period_in_10nsec);
+	return 1;
+}
+int64_t Feb_Control_GetSubFramePeriod(){return Feb_Control_subframe_period_in_10nsec*10;}
+
+
 int Feb_Control_SetExposurePeriod(double the_exposure_period_in_sec){
 	Feb_Control_exposure_period_in_sec = the_exposure_period_in_sec;
 	printf("Exposure period set to: %f\n",Feb_Control_exposure_period_in_sec);
@@ -1510,9 +1520,11 @@ int Feb_Control_PrepareForAcquisition(){//return 1;
 	reg_vals[4]=(Feb_Control_acquireNReadoutMode|Feb_Control_triggerMode|Feb_Control_externalEnableMode|Feb_Control_subFrameMode);
 	reg_nums[5]=DAQ_REG_SUBFRAME_EXPOSURES;
 	reg_vals[5]= Feb_Control_subframe_exposure_time_in_10nsec; //(1 means 10ns, 100 means 1000ns)
+	reg_nums[6]=DAQ_REG_SUBFRAME_PERIOD;
+	reg_vals[6]= Feb_Control_subframe_period_in_10nsec; //(1 means 10ns, 100 means 1000ns)
 	// if(!Feb_Interface_WriteRegisters((Module_GetTopLeftAddress(&modules[1])|Module_GetTopRightAddress(&modules[1])),20,reg_nums,reg_vals,0,0)){
 	if(Feb_Control_activated){
-		if(!Feb_Interface_WriteRegisters(Feb_Control_AddressToAll(),6,reg_nums,reg_vals,0,0)){
+		if(!Feb_Interface_WriteRegisters(Feb_Control_AddressToAll(),7,reg_nums,reg_vals,0,0)){
 			printf("Trouble starting acquisition....\n");;
 			return 0;
 		}
@@ -1947,19 +1959,79 @@ int Feb_Control_GetRightFPGATemp(){
 	return (int)temperature;
 }
 
+int64_t Feb_Control_GetMeasuredPeriod() {
+	unsigned int sub_num = (Module_TopAddressIsValid(&modules[1])) ?
+			Module_GetTopLeftAddress (&modules[1]):
+			Module_GetBottomLeftAddress (&modules[1]);
+
+	unsigned int  value = 0;
+	Feb_Interface_ReadRegister(sub_num,MEAS_PERIOD_REG, &value);
+	return (int64_t)value*10;
+}
+
+int64_t Feb_Control_GetSubMeasuredPeriod() {
+	unsigned int sub_num = (Module_TopAddressIsValid(&modules[1])) ?
+			Module_GetTopLeftAddress (&modules[1]):
+			Module_GetBottomLeftAddress (&modules[1]);
+
+	unsigned int value = 0;
+	Feb_Interface_ReadRegister(sub_num,MEAS_SUBPERIOD_REG, &value);
+	return (int64_t)value*10;
+}
+
+
+int Feb_Control_SoftwareTrigger() {
+	unsigned int orig_value = 0;
+	Feb_Interface_ReadRegister(Feb_Control_AddressToAll(),DAQ_REG_CHIP_CMDS, &orig_value);
+
+	unsigned int cmd = orig_value | DAQ_REG_CHIP_CMDS_INT_TRIGGER;
+
+	if(Feb_Control_activated) {
+		// set trigger bit
+#ifdef VERBOSE
+		cprintf(BLUE,"Setting Trigger, Register:0x%x\n",cmd);
+#endif
+		if (!Feb_Interface_WriteRegister(Feb_Control_AddressToAll(),DAQ_REG_CHIP_CMDS,cmd,0,0)) {
+			cprintf(RED,"Warning: Could not give software trigger\n");
+			return 0;
+		}
+		// unset trigger bit
+#ifdef VERBOSE
+		cprintf(BLUE,"Unsetting Trigger, Register:0x%x\n",orig_value);
+#endif
+		if (!Feb_Interface_WriteRegister(Feb_Control_AddressToAll(),DAQ_REG_CHIP_CMDS,orig_value,0,0)) {
+			cprintf(RED,"Warning: Could not give software trigger\n");
+			return 0;
+		}
+		cprintf(BLUE,"Software Internal Trigger Sent!\n");
+	}
+
+	return 1;
+}
+
 
 uint32_t Feb_Control_WriteRegister(uint32_t offset, uint32_t data) {
 	uint32_t value=0;
 	if(Module_TopAddressIsValid(&modules[1])){
 		if(!Feb_Interface_WriteRegister(Module_GetTopRightAddress (&modules[1]),offset, data,0, 0)) {
-			cprintf(RED,"Could not read value. Value read:%d\n", value);
+			cprintf(RED,"Could not read tr value. Value read:%d\n", value);
 			value = 0;
 		}
+		if(!Feb_Interface_WriteRegister(Module_GetTopLeftAddress (&modules[1]),offset, data,0, 0)) {
+		    cprintf(RED,"Could not read tl value. Value read:%d\n", value);
+		    value = 0;
+		}
+
 	} else {
 		if(!Feb_Interface_WriteRegister(Module_GetBottomRightAddress (&modules[1]),offset, data,0, 0)) {
-			cprintf(RED,"Could not read value. Value read:%d\n", value);
+			cprintf(RED,"Could not read br value. Value read:%d\n", value);
 			value = 0;
 		}
+		if(!Feb_Interface_WriteRegister(Module_GetBottomLeftAddress (&modules[1]),offset, data,0, 0)) {
+		    cprintf(RED,"Could not read bl value. Value read:%d\n", value);
+		    value = 0;
+		}
+
 	}
 	return Feb_Control_ReadRegister(offset);
 }
@@ -1967,16 +2039,34 @@ uint32_t Feb_Control_WriteRegister(uint32_t offset, uint32_t data) {
 
 uint32_t Feb_Control_ReadRegister(uint32_t offset) {
 	uint32_t value=0;
+	uint32_t value1=0;
 	if(Module_TopAddressIsValid(&modules[1])){
-		if(!Feb_Interface_ReadRegister(Module_GetTopRightAddress (&modules[1]),offset, &value)) {
-			cprintf(RED,"Could not read value. Value read:%d\n", value);
-			value = 0;
-		}
+	    if(!Feb_Interface_ReadRegister(Module_GetTopRightAddress (&modules[1]),offset, &value)) {
+	        cprintf(RED,"Could not read value. Value read:%d\n", value);
+	        value = 0;
+	    }
+	    printf("Read top right addr: 0x%08x\n", value);
+	    if(!Feb_Interface_ReadRegister(Module_GetTopLeftAddress (&modules[1]),offset, &value1)) {
+	        cprintf(RED,"Could not read value. Value read:%d\n", value1);
+	        value1 = 0;
+	    }
+	    printf("Read top left addr: 0x%08x\n", value1);
+	    if (value != value1)
+	        value = -1;
+
 	} else {
-		if(!Feb_Interface_ReadRegister(Module_GetBottomRightAddress (&modules[1]),offset, &value)) {
-			cprintf(RED,"Could not read value. Value read:%d\n", value);
-			value = 0;
-		}
+	    if(!Feb_Interface_ReadRegister(Module_GetBottomRightAddress (&modules[1]),offset, &value)) {
+	        cprintf(RED,"Could not read value. Value read:%d\n", value);
+	        value = 0;
+	    }
+	    printf("Read bottom right addr: 0x%08x\n", value);
+	    if(!Feb_Interface_ReadRegister(Module_GetBottomLeftAddress (&modules[1]),offset, &value1)) {
+	        cprintf(RED,"Could not read value. Value read:%d\n", value1);
+	        value1 = 0;
+	    }
+	    printf("Read bottom left addr: 0x%08x\n", value1);
+	    if (value != value1)
+	        value = -1;
 	}
 	return value;
 }

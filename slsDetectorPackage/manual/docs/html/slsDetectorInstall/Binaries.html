@@ -1,6 +1,6 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
 
-<!--Converted with LaTeX2HTML 2008 (1.71)
+<!--Converted with LaTeX2HTML 2012 (1.2)
 original version by:  Nikos Drakos, CBLU, University of Leeds
 * revised and updated by:  Marcus Hennecke, Ross Moore, Herb Swan
 * with significant contributions from:
@@ -13,7 +13,7 @@ original version by:  Nikos Drakos, CBLU, University of Leeds
 <META NAME="resource-type" CONTENT="document">
 <META NAME="distribution" CONTENT="global">
 
-<META NAME="Generator" CONTENT="LaTeX2HTML v2008">
+<META NAME="Generator" CONTENT="LaTeX2HTML v2012">
 <META HTTP-EQUIV="Content-Style-Type" CONTENT="text/css">
 
 <LINK REL="STYLESHEET" HREF="slsDetectorInstall.css">
@@ -55,6 +55,14 @@ detectors and data receivers using the command line.
 The <I>data receiver</I>, which can be run on a different machine than the
 client, receives the data from the detector and processes it. The receiver can
 be configured, controlled and monitored by the client.
+
+<P>
+</LI>
+<LI><FONT COLOR="#0000ff">slsMultiReceiver</FONT>: 
+<BR>
+It is the same as the <I>slsReceiver</I>, but that it is a single process 
+for many multiple slsReceiver child processes. One can configure the start TCP port,
+number of slsReceiver processes and if call back should be enabled or not.
 
 <P>
 </LI>

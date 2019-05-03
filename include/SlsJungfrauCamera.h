@@ -248,10 +248,10 @@ namespace lima
             // Related to commands (put & get)
             //==================================================================
                 // Executes a set command
-                std::string setCmd(const std::string & in_command);
+                std::string setCmd(const std::string & in_command, int in_module_index = -1);
 
                 // Executes a get command
-                std::string getCmd(const std::string & in_command);
+                std::string getCmd(const std::string & in_command, int in_module_index = -1);
 
             //==================================================================
             // Related to specifics attributes

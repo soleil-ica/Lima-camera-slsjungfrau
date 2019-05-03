@@ -54,7 +54,6 @@ CameraReceiver::~CameraReceiver()
 {
     if(m_receiver != NULL)
     {
-        m_receiver->stop();
         delete m_receiver;
         m_receiver = NULL;
     }

@@ -74,7 +74,7 @@ void qTabMeasurement::SetupWidgetWindow(){
 		comboDelayUnit->setCurrentIndex((int)unit);
 	}
 	//gates
-	if ((detType == slsDetectorDefs::EIGER) || (detType == slsDetectorDefs::JUNGFRAU)) {
+	if ((detType == slsDetectorDefs::EIGER) || (detType == slsDetectorDefs::JUNGFRAU) || (detType == slsDetectorDefs::JUNGFRAUCTB)) {
 		lblNumGates->setEnabled(false);
 		spinNumGates->setEnabled(false);
 	} else
@@ -93,12 +93,6 @@ void qTabMeasurement::SetupWidgetWindow(){
 	//file write enabled/disabled
 	chkFile->setChecked(myDet->enableWriteToFile());
 	dispFileName->setEnabled(myDet->enableWriteToFile());
-
-
-	//creating the icons for the buttons
-	iconStart = new QIcon(":/icons/images/start.png");
-	iconStop = new QIcon(":/icons/images/stop.png");
-
 
 	//Timer to update the progress bar
 	progressTimer = new QTimer(this);
@@ -160,6 +154,7 @@ void qTabMeasurement::SetupTimingMode(){
 		case slsDetectorDefs::PROPIX:
 		case slsDetectorDefs::GOTTHARD:
 		case slsDetectorDefs::JUNGFRAU:
+		case slsDetectorDefs::JUNGFRAUCTB:
 			item[(int)Trigger_Exp_Series]->setEnabled(true);
 			item[(int)Trigger_Readout]->setEnabled(false);
 			item[(int)Gated]->setEnabled(false);
@@ -216,7 +211,10 @@ void qTabMeasurement::GetModeFromDetector(bool startup){
 		if(mode==slsDetectorDefs::AUTO_TIMING){
 			int frames = spinNumFrames->value();
 			int triggers = spinNumTriggers->value();
-			if((frames==1)&&(triggers==1)){
+			int storagecells = 0;
+			if (detType == slsDetectorDefs::JUNGFRAU)
+			    storagecells = myDet->setTimer(slsDetectorDefs::STORAGE_CELL_NUMBER, -1);
+			if((frames==1)&&(triggers==1)&&(storagecells==0)){
 				comboTimingMode->setCurrentIndex((int)None);
 				SetTimingMode((int)None);
 			}else{
@@ -266,8 +264,10 @@ void qTabMeasurement::Initialization(){
 	connect(dispFileName,		SIGNAL(editingFinished()),this,	SLOT(setFileName()));
 	//File Index
 	connect(spinIndex,			SIGNAL(valueChanged(int)),			this,	SLOT(setRunIndex(int)));
-	//Start/Stop Acquisition
-	connect(btnStartStop,		SIGNAL(clicked()),					this,	SLOT(startStopAcquisition()));
+	//Start Acquisition
+	connect(btnStart,		    SIGNAL(clicked()),					this,	SLOT(startAcquisition()));
+    //Stop Acquisition
+    connect(btnStop,            SIGNAL(clicked()),                  this,   SLOT(stopAcquisition()));
 	//Timing Mode
 	connect(comboTimingMode,	SIGNAL(currentIndexChanged(int)),	this,	SLOT(SetTimingMode(int)));//
 	//progress bar
@@ -292,7 +292,7 @@ void qTabMeasurement::Initialization(){
 	}
 
 	//Number of Gates
-	if ((detType != slsDetectorDefs::EIGER) && (detType != slsDetectorDefs::JUNGFRAU))
+	if ((detType != slsDetectorDefs::EIGER) && (detType != slsDetectorDefs::JUNGFRAU) && (detType != slsDetectorDefs::JUNGFRAUCTB))
 		connect(spinNumGates,SIGNAL(valueChanged(int)),				this,	SLOT(setNumGates(int)));
 
 	//Number of Probes
@@ -308,75 +308,53 @@ void qTabMeasurement::Enable(bool enable){
 	frameNotTimeResolved->setEnabled(enable);
 
 	//shortcut each time, else it doesnt work a second time
-	btnStartStop->setShortcut(QApplication::translate("TabMeasurementObject", "Shift+Space", 0, QApplication::UnicodeUTF8));
+	btnStart->setShortcut(QApplication::translate("TabMeasurementObject", "Shift+Space", 0, QApplication::UnicodeUTF8));
 }
 
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 
 
-void qTabMeasurement::startStopAcquisition(){
-	if(btnStartStop->isChecked()){
-
-		//if file write enabled and output dir doesnt exist
-		if((chkFile->isChecked())&&(thisParent->DoesOutputDirExist() == slsDetectorDefs::FAIL)){
-			if(qDefs::Message(qDefs::QUESTION,
-					"<nobr>Your data will not be saved.</nobr><br><nobr>Disable File write and Proceed with acquisition anyway?</nobr>",
-					"qTabMeasurement::startStopAcquisition") == slsDetectorDefs::FAIL){
-				disconnect(btnStartStop,SIGNAL(clicked()),this,SLOT(startStopAcquisition()));
-				btnStartStop->click();
-				connect(btnStartStop,SIGNAL(clicked()),this,SLOT(startStopAcquisition()));
-				return;
-			}else{
-				//done because for receiver it cant save a file with blank file path and returns without acquiring even to the gui
-				disconnect(chkFile, 			SIGNAL(toggled(bool)), 				this, SLOT(EnableFileWrite(bool)));
-				chkFile->setChecked(false);
-				EnableFileWrite(false);
-				connect(chkFile, 			SIGNAL(toggled(bool)), 				this, SLOT(EnableFileWrite(bool)));
-			}
-		}
+void qTabMeasurement::startAcquisition(){
+    btnStart->setEnabled(false);
+    //if file write enabled and output dir doesnt exist
+    if((chkFile->isChecked())&&(thisParent->DoesOutputDirExist() == slsDetectorDefs::FAIL)){
+        if(qDefs::Message(qDefs::QUESTION,
+                "<nobr>Your data will not be saved.</nobr><br><nobr>Disable File write and Proceed with acquisition anyway?</nobr>",
+                "qTabMeasurement::startAcquisition") == slsDetectorDefs::FAIL){
+            btnStart->setEnabled(true);
+            return;
+        }else{
+            //done because for receiver it cant save a file with blank file path and returns without acquiring even to the gui
+            disconnect(chkFile, 			SIGNAL(toggled(bool)), 				this, SLOT(EnableFileWrite(bool)));
+            chkFile->setChecked(false);
+            EnableFileWrite(false);
+            connect(chkFile, 			SIGNAL(toggled(bool)), 				this, SLOT(EnableFileWrite(bool)));
+        }
+    }
 
 #ifdef VERBOSE
-		cout << endl << endl << "Starting Acquisition" << endl;
+    cout << endl << endl << "Starting Acquisition" << endl;
 #endif
-		//btnStartStop->setStyleSheet("color:red");
-		btnStartStop->setText("Stop");
-		btnStartStop->setIcon(*iconStop);
-		lblProgressIndex->setText(QString::number(0));
-		Enable(0);
-		progressBar->setValue(0);
-		progressTimer->start(100);
+    lblProgressIndex->setText(QString::number(0));
+    Enable(0);
+    progressBar->setValue(0);
+    progressTimer->start(100);
 
-		emit StartSignal();
-	}else{
-#ifdef VERBOSE
-		cout << "Stopping Acquisition" << endl<< endl;
-#endif
-		//emit StopSignal(); commented out to prevent undefined state
-		myDet->stopAcquisition();
-		/* commented out to prevent undefined state
-		myDet->waitForReceiverReadToFinish();
-		UpdateProgress();
-		//spin index
-		disconnect(spinIndex,			SIGNAL(valueChanged(int)),			this,	SLOT(setRunIndex(int)));
-		spinIndex->setValue(myDet->getFileIndex());
-		connect(spinIndex,			SIGNAL(valueChanged(int)),			this,	SLOT(setRunIndex(int)));
-		progressTimer->stop();
-		btnStartStop->setText("Start");
-		btnStartStop->setIcon(*iconStart);
-		btnStartStop->setChecked(false);
-		Enable(1);*/
-	}
-	qDefs::checkErrorMessage(myDet,"qTabMeasurement::startStopAcquisition");
+    emit StartSignal();
+    qDefs::checkErrorMessage(myDet,"qTabMeasurement::startAcquisition");
 }
 
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 
 
-void qTabMeasurement::AcquisitionFinished(){
-	disconnect(btnStartStop,SIGNAL(clicked()),this,SLOT(startStopAcquisition()));
-	btnStartStop->setText("Wait");
+void qTabMeasurement::stopAcquisition(){
+#ifdef VERBOSE
+    cout << "Stopping Acquisition" << endl<< endl;
+#endif
+    myDet->stopAcquisition();
+    qDefs::checkErrorMessage(myDet,"qTabMeasurement::stopAcquisition");
 }
 
 
@@ -390,12 +368,8 @@ void qTabMeasurement::UpdateFinished(){
 	connect(spinIndex,			SIGNAL(valueChanged(int)),			this,	SLOT(setRunIndex(int)));
 	progressTimer->stop();
 
-	/*disconnect(btnStartStop,SIGNAL(clicked()),this,SLOT(startStopAcquisition())); done in AcquisitionFinished() already */
-	btnStartStop->setText("Start");
-	btnStartStop->setIcon(*iconStart);
-	btnStartStop->setChecked(false);
 	Enable(1);
-	connect(btnStartStop,SIGNAL(clicked()),this,SLOT(startStopAcquisition()));
+    btnStart->setEnabled(true);
 	qDefs::checkErrorMessage(myDet,"qTabMeasurement::UpdateFinished");
 }
 
@@ -659,6 +633,8 @@ void qTabMeasurement::SetTimingMode(int mode){
 		lblExpTime->setEnabled(true);		spinExpTime->setEnabled(true);			comboExpUnit->setEnabled(true);
 		spinNumTriggers->setValue(1);
 		spinNumFrames->setValue(1);
+		if (detType == slsDetectorDefs::JUNGFRAU)
+		    myDet->setTimer(slsReceiverDefs::STORAGE_CELL_NUMBER, 0);
 		if(myDet->setExternalCommunicationMode(slsDetectorDefs::AUTO_TIMING)==slsDetectorDefs::AUTO_TIMING)
 			success = true;
 		break;
@@ -737,6 +713,8 @@ void qTabMeasurement::SetTimingMode(int mode){
 				"Number of Frames \t: 1\nNumber of Triggers \t: 1","qTabMeasurement::SetTimingMode");
 		spinNumFrames->setValue(1);
 		spinNumTriggers->setValue(1);
+		if (detType == slsReceiverDefs::JUNGFRAU)
+		    myDet->setTimer(slsDetectorDefs::STORAGE_CELL_NUMBER, 0);
 		comboTimingMode->setCurrentIndex((int)None);
 		return;
 	}
@@ -812,7 +790,7 @@ void qTabMeasurement::Refresh(){
 			disconnect(spinDelay,			SIGNAL(valueChanged(double)),		this,	SLOT(setDelay()));
 			disconnect(comboDelayUnit,		SIGNAL(currentIndexChanged(int)),	this,	SLOT(setDelay()));
 		}
-		if ((detType != slsDetectorDefs::EIGER) && (detType != slsDetectorDefs::JUNGFRAU))
+		if ((detType != slsDetectorDefs::EIGER) && (detType != slsDetectorDefs::JUNGFRAU) && (detType != slsDetectorDefs::JUNGFRAUCTB))
 			disconnect(spinNumGates,		SIGNAL(valueChanged(int)),		 	this,	SLOT(setNumGates(int)));
 
 #ifdef VERBOSE
@@ -846,8 +824,9 @@ void qTabMeasurement::Refresh(){
 		    time = qDefs::getCorrectTime(unit,((double)(myDet->setTimer(slsDetectorDefs::DELAY_AFTER_TRIGGER,-1)*(1E-9))));
 
 		//gates
-	    if ((detType != slsDetectorDefs::EIGER) && (detType != slsDetectorDefs::JUNGFRAU))
+	    if ((detType != slsDetectorDefs::EIGER) && (detType != slsDetectorDefs::JUNGFRAU) && (detType != slsDetectorDefs::JUNGFRAUCTB)  )
 	        spinNumGates->setValue((int)myDet->setTimer(slsDetectorDefs::GATES_NUMBER,-1));
+
 
 		//Number of Triggers
 		spinNumTriggers->setValue((int)myDet->setTimer(slsDetectorDefs::CYCLES_NUMBER,-1));
@@ -883,7 +862,7 @@ void qTabMeasurement::Refresh(){
 			connect(spinDelay,			SIGNAL(valueChanged(double)),		this,	SLOT(setDelay()));
 			connect(comboDelayUnit,		SIGNAL(currentIndexChanged(int)),	this,	SLOT(setDelay()));
 		}
-		if ((detType != slsDetectorDefs::EIGER) && (detType != slsDetectorDefs::JUNGFRAU))
+		if ((detType != slsDetectorDefs::EIGER) && (detType != slsDetectorDefs::JUNGFRAU) && (detType != slsDetectorDefs::JUNGFRAUCTB))
 			connect(spinNumGates,		SIGNAL(valueChanged(int)),		 	this,	SLOT(setNumGates(int)));
 
 		//timing mode - will also check if exptime>acq period and also enableprobes()

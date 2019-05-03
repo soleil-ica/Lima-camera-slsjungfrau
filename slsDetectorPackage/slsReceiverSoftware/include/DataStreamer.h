@@ -14,18 +14,25 @@ class Fifo;
 class DataStreamer;
 class ZmqSocket;
 
+#include <vector>
+
 class DataStreamer : private virtual slsReceiverDefs, public ThreadObject {
 	
  public:
 	/**
 	 * Constructor
 	 * Calls Base Class CreateThread(), sets ErrorMask if error and increments NumberofDataStreamers
+     * @param ind self index
 	 * @param f address of Fifo pointer
 	 * @param dr pointer to dynamic range
-	 * @param sEnable pointer to short frame enable
+	 * @param r roi
 	 * @param fi pointer to file index
+	 * @param fd flipped data enable for x and y dimensions
+	 * @param ajh additional json header
+	 * @param sm pointer to silent mode
 	 */
-	DataStreamer(Fifo*& f, uint32_t* dr, int* sEnable, uint64_t* fi);
+	DataStreamer(int ind, Fifo*& f, uint32_t* dr, std::vector<ROI>* r,
+			uint64_t* fi, int* fd, char* ajh, bool* sm);
 
 	/**
 	 * Destructor
@@ -33,34 +40,12 @@ class DataStreamer : private virtual slsReceiverDefs, public ThreadObject {
 	 */
 	~DataStreamer();
 
-
-	//*** static functions ***
-	/**
-	 * Get RunningMask
-	 * @return RunningMask
-	 */
-	static uint64_t GetErrorMask();
-
-	/**
-	 * Get RunningMask
-	 * @return RunningMask
-	 */
-	static uint64_t GetRunningMask();
-
-	/**
-	 * Reset RunningMask
-	 */
-	static void ResetRunningMask();
-
-	/**
-	 * Set Silent Mode
-	 * @param mode 1 sets 0 unsets
-	 */
-	static void SetSilentMode(bool mode);
-
-	//*** non static functions ***
 	//*** getters ***
-
+    /**
+     * Returns if the thread is currently running
+     * @returns true if thread is running, else false
+     */
+    bool IsRunning();
 
 
 	//*** setters ***
@@ -105,11 +90,12 @@ class DataStreamer : private virtual slsReceiverDefs, public ThreadObject {
 
 	/**
 	 * Creates Zmq Sockets
+	 * (throws an exception if it couldnt create zmq sockets)
 	 * @param nunits pointer to number of theads/ units per detector
 	 * @param port streaming port start index
-	 * @return OK or FAIL
+	 * @param srcip streaming source ip
 	 */
-	int CreateZmqSockets(int* nunits, uint32_t port);
+	void CreateZmqSockets(int* nunits, uint32_t port, const char* srcip);
 
 	/**
 	 * Shuts down and deletes Zmq Sockets
@@ -120,7 +106,8 @@ class DataStreamer : private virtual slsReceiverDefs, public ThreadObject {
 	 * Restream stop dummy packet
 	 * @return OK or FAIL
 	 */
-	int restreamStop();
+	int RestreamStop();
+
 
  private:
 
@@ -129,12 +116,6 @@ class DataStreamer : private virtual slsReceiverDefs, public ThreadObject {
 	 * @return type
 	 */
 	std::string GetType();
-
-	/**
-	 * Returns if the thread is currently running
-	 * @returns true if thread is running, else false
-	 */
-	bool IsRunning();
 
 	/**
 	 * Record First Indices (firstAcquisitionIndex, firstMeasurementIndex)
@@ -164,35 +145,26 @@ class DataStreamer : private virtual slsReceiverDefs, public ThreadObject {
 
 	/**
 	 * Create and send Json Header
-	 * @param header header of image
+	 * @param rheader header of image
+	 * @param size data size (could have been modified in call back)
+	 * @param nx number of pixels in x dim
+	 * @param ny number of pixels in y dim
 	 * @param dummy true if its a dummy header
 	 * @returns 0 if error, else 1
 	 */
-	int SendHeader(sls_detector_header* header, bool dummy = false);
+	int SendHeader(sls_receiver_header* rheader, uint32_t size = 0, uint32_t nx = 0, uint32_t ny = 0, bool dummy = true);
 
 	/** type of thread */
 	static const std::string TypeName;
 
-	/** Total Number of DataStreamer Objects */
-	static int NumberofDataStreamers;
-
-	/** Mask of errors on any object eg.thread creation */
-	static uint64_t ErrorMask;
-
-	/** Mask of all listener objects running */
-	static uint64_t RunningMask;
-
-	/** mutex to update static items among objects (threads)*/
-	static pthread_mutex_t Mutex;
+    /** Object running status */
+    bool runningFlag;
 
 	/** GeneralData (Detector Data) object */
 	const GeneralData* generalData;
 
 	/** Fifo structure */
 	Fifo* fifo;
-
-	/** Silent Mode */
-	static bool SilentMode;
 
 
 
@@ -202,11 +174,20 @@ class DataStreamer : private virtual slsReceiverDefs, public ThreadObject {
 	/** Pointer to dynamic range */
 	uint32_t* dynamicRange;
 
-	/** Pointer to short frame enable */
-	int* shortFrameEnable;
+	/** ROI */
+	std::vector<ROI>* roi;
+
+	/** adc Configured */
+	int adcConfigured;
 
 	/** Pointer to file index */
 	uint64_t* fileIndex;
+
+	/** flipped data across both dimensions enable */
+	int* flippedData;
+
+	/** additional json header */
+	char* additionJsonHeader;
 
 	/** Aquisition Started flag */
 	bool acquisitionStartedFlag;
@@ -225,5 +206,6 @@ class DataStreamer : private virtual slsReceiverDefs, public ThreadObject {
 
 	/** Complete buffer used for roi, eg. shortGotthard */
 	char* completeBuffer;
+
 };
 

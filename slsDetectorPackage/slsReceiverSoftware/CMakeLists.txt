@@ -18,7 +18,7 @@ set(SOURCES
 
 
 # HDF5
-if (USE_HDF5)
+if (SLS_USE_HDF5)
 	if (HDF5_FOUND)
 	    include_directories( 
 	        ${HDF5_INCLUDE_DIRS}
@@ -28,10 +28,9 @@ if (USE_HDF5)
 	    )
 	    list (APPEND SOURCES 
 	        src/HDF5File.cpp 
-	        src/HDF5FileStatic.cpp
 	    )
 	endif ()
-endif (USE_HDF5)
+endif (SLS_USE_HDF5)
 
 
 add_definitions(
@@ -42,19 +41,11 @@ include_directories(
     include
 )
 
-add_library(zmq STATIC IMPORTED )
+add_library(zmq STATIC IMPORTED GLOBAL)
 
+set(ZMQ_STATIC_ARCHIVE ${CMAKE_CURRENT_SOURCE_DIR}/include/libzmq.a)
 set_target_properties(zmq PROPERTIES
-    IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/include/libzmq.a
-)
-
-add_library(slsReceiverStatic STATIC
-    ${SOURCES}
-    ${HEADERS}
-)
-set_target_properties(slsReceiverStatic PROPERTIES
-    ARCHIVE_OUTPUT_NAME SlsReceiver
-    ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+    IMPORTED_LOCATION ${ZMQ_STATIC_ARCHIVE}
 )
 
 add_library(slsReceiverShared SHARED
@@ -68,7 +59,8 @@ set(PUBLICHEADERS
     include/sls_receiver_funcs.h
     include/MySocketTCP.h
     include/genericSocket.h
-
+    include/logger.h
+	include/sls_receiver_exceptions.h
 )
 
 
@@ -97,8 +89,12 @@ endif ()
 
 
 
-install(TARGETS slsReceiverShared slsReceiverStatic slsReceiver
+install(TARGETS slsReceiverShared slsReceiver
+        EXPORT "${TARGETS_EXPORT_NAME}"
         RUNTIME DESTINATION bin
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib
         PUBLIC_HEADER DESTINATION include)
+
+install(FILES ${ZMQ_STATIC_ARCHIVE}
+DESTINATION lib)       
