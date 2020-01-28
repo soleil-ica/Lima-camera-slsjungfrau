@@ -21,9 +21,9 @@
 #include "slsDetectorUsers.h"
 
 //#define GOTTHARD_25_TEST
-//#define JUNGFRAU_TEST
+#define JUNGFRAU_TEST
 //#define GOTTHARD_TEST
-#define EIGER_TEST
+//#define EIGER_TEST
 
 //======================================================================================================
 // test configuration
@@ -451,7 +451,7 @@ void CreateDetector(void)
 
     // configuration file is used to properly configure advanced settings in the shared memory
     result = detector->readConfigurationFile(detector_config_file_name);
-
+    
     if(result == slsDetectorDefs::FAIL)
     {
 		std::cout << "readConfigurationFile failed! Could not initialize the camera!" << std::endl;
@@ -971,6 +971,8 @@ int main (int argc, char* argv[])
         detector_parallel_mode = parallel_mode;
     }
 #endif
+
+    Test();
 
     std::cout << "====================== ENDING ======================" << std::endl;
 
