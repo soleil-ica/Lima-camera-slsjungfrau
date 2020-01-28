@@ -58,6 +58,15 @@ CameraThread::CameraThread(Camera & cam) : m_cam(cam)
 }
 
 /************************************************************************
+ * \brief destructor
+ ************************************************************************/
+CameraThread::~CameraThread()
+{
+    DEB_MEMBER_FUNCT();
+    DEB_TRACE() << "CameraThread::~CameraThread";
+}
+
+/************************************************************************
  * \brief starts the thread
  ************************************************************************/
 void CameraThread::start()
@@ -87,7 +96,6 @@ void CameraThread::abort()
 {
 	DEB_MEMBER_FUNCT();
     CmdThread::abort();
-	DEB_TRACE() << "DONE";
 }
 
 /************************************************************************
@@ -127,10 +135,13 @@ void CameraThread::execStopAcq()
 {
     DEB_MEMBER_FUNCT();
 
-    int status = getStatus();
-
-    if (status == CameraThread::Running)
+    if(getStatus() == CameraThread::Running)
+    {
         m_force_stop = true;
+
+        // Waiting for thread to finish or to be in error
+        waitNotStatus(CameraThread::Running);
+    }
 }
 
 /************************************************************************
@@ -251,6 +262,7 @@ void CameraThread::execStartAcq()
                 std::stringstream tempStream;
                 tempStream << "Lost " << lost_frames_nb << " frames during real time acquisition!";
                 REPORT_EVENT(tempStream.str());
+                return;
             }
         }
     }
@@ -264,6 +276,7 @@ void CameraThread::execStartAcq()
 
             std::string errorText = "Could not stop real time acquisition!";
             REPORT_EVENT(errorText);
+            return;
         }
     }
 

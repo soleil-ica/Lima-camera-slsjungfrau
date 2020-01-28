@@ -51,7 +51,7 @@ using namespace lima::SlsJungfrau;
 Camera::Camera(const std::string & in_config_file_name   ,
                const double        in_readout_time_sec   ,
                const long          in_receiver_fifo_depth,
-               const long          in_frame_packet_number) : m_thread(*this), m_frames_manager(*this)
+               const long          in_frame_packet_number) : m_frames_manager(*this)
 {
     DEB_CONSTRUCTOR();
 
@@ -80,6 +80,12 @@ Camera::Camera(const std::string & in_config_file_name   ,
     m_module_firmware_version   = "undefined";
 
     init(in_config_file_name);
+
+    // creating the camera thread
+    m_thread = new CameraThread(*this);
+
+    // starting the acquisition thread
+    m_thread->start();
 }
 
 /************************************************************************
@@ -89,8 +95,11 @@ Camera::~Camera()
 {
     DEB_DESTRUCTOR();
 
-    // stopping the acquisition
-    stopAcq();
+    // stopping the acquisition and aborting the thread
+    applyStopAcq(false, true);
+
+    // releasing the camera thread
+    delete m_thread;
 
     // releasing the detector control instance
     DEB_TRACE() << "Camera::Camera - releasing the detector control instance";
@@ -154,6 +163,10 @@ void Camera::init(const std::string & in_config_file_name)
 
     if(result == slsDetectorDefs::FAIL)
     {
+        // cleaning the shared memory because sometimes it can be corrupted
+        // It could help when the device will be restarted.
+        cleanSharedMemory();
+
         THROW_HW_FATAL(ErrorType::Error) << "readConfigurationFile failed! Could not initialize the camera!";
     }
 
@@ -203,9 +216,6 @@ void Camera::init(const std::string & in_config_file_name)
     m_detector_model            = m_detector_control->getDetectorType();
     m_detector_firmware_version = convertVersionToString(m_detector_control->getDetectorFirmwareVersion());
     m_detector_software_version = convertVersionToString(m_detector_control->getDetectorSoftwareVersion());
-
-    // starting the acquisition thread
-    m_thread.start();
 
     // logging some versions informations
     DEB_TRACE() << "Module   Firmware Version : " << getModuleFirmwareVersion  ();
@@ -266,10 +276,10 @@ void Camera::prepareAcq()
  *******************************************************************/
 void Camera::startAcq()
 {
-    DEB_MEMBER_FUNCT();
+    stopAcq();
 
-    m_thread.sendCmd(CameraThread::StartAcq);
-    m_thread.waitNotStatus(CameraThread::Idle);
+    m_thread->sendCmd(CameraThread::StartAcq);
+    m_thread->waitNotStatus(CameraThread::Idle);
 }
 
 /*******************************************************************
@@ -277,23 +287,47 @@ void Camera::startAcq()
  *******************************************************************/
 void Camera::stopAcq()
 {
+    // stopping the thread and restarting the thread in case of error
+    applyStopAcq(true, false);
+}
+
+/*******************************************************************
+ * \brief stops the acquisition and abort or restart the acq thread 
+ *        if it is in error. Can also abort the thread when we exit
+ *        the program.
+ *******************************************************************/
+void Camera::applyStopAcq(bool in_restart, bool in_always_abort)
+{
     DEB_MEMBER_FUNCT();
 
 	DEB_TRACE() << "executing StopAcq command...";
 
-    if(m_thread.getStatus() != CameraThread::Error)
-    {
-        m_thread.execStopAcq();
-
-        // Waiting for thread to finish or to be in error
-        m_thread.waitNotStatus(CameraThread::Running);
-    }
+    m_thread->execStopAcq();
 
     // thread in error
-    if(m_thread.getStatus() == CameraThread::Error)
+    if(m_thread->getStatus() == CameraThread::Error)
     {
-        // aborting & restart the thread
-        m_thread.abort();
+        // aborting the thread
+        m_thread->abort();
+
+        if(in_restart)
+        {
+            // releasing the camera thread
+            delete m_thread;
+
+            // creating the camera thread
+            m_thread = new CameraThread(*this);
+
+            // starting the acquisition thread
+            m_thread->start();
+        }
+    }
+    else
+    // we are going to exit the program, so we are forcing an abort
+    if(in_always_abort)
+    {
+        // aborting the thread
+        m_thread->abort();
     }
 }
 
@@ -492,7 +526,7 @@ Camera::Status Camera::getStatus()
 
     Camera::Status result;
 
-    int thread_status = m_thread.getStatus();
+    int thread_status = m_thread->getStatus();
 
     // error during the acquisition management ?
     // the device becomes in error state.

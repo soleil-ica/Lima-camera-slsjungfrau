@@ -334,6 +334,10 @@ namespace lima
                 // stop detector real time acquisition
                 int stopAcquisition();
 
+                // stops the acquisition and abort or restart the acq thread if it is in error
+                // can also abort the thread when we exit the program.
+                void applyStopAcq(bool in_restart, bool in_always_abort);
+
             //------------------------------------------------------------------
             // status management
             //------------------------------------------------------------------
@@ -440,7 +444,7 @@ namespace lima
             //------------------------------------------------------------------
             // main acquisition thread
             //------------------------------------------------------------------
-            CameraThread m_thread;
+            CameraThread * m_thread;
 
             //------------------------------------------------------------------
             // frames manager

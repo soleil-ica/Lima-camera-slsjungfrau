@@ -80,6 +80,9 @@ namespace lima
             // constructor
             CameraThread(Camera & cam);
 
+            // destructor
+            virtual ~CameraThread();
+
             // starts the thread
             virtual void start();
 
