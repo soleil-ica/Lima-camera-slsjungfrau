@@ -55,6 +55,15 @@ namespace lima
         static const std::string SLS_TRIGGER_MODE_AUTO    = "auto"   ; // there is no triggers enums in the current sls sdk
         static const std::string SLS_TRIGGER_MODE_TRIGGER = "trigger"; // there is no triggers enums in the current sls sdk
 
+        // there is no gain enums in the current sls sdk
+        static const std::string SLS_GAIN_MODE_DYNAMIC       = "dynamicgain"  ; 
+        static const std::string SLS_GAIN_MODE_UNDEFINED     = "undefined"    ;
+        static const std::string SLS_GAIN_MODE_DYNAMICHG0    = "dynamichg0"   ; 
+        static const std::string SLS_GAIN_MODE_FIXGAIN1      = "fixgain1"     ; 
+        static const std::string SLS_GAIN_MODE_FIXGAIN2      = "fixgain2"     ; 
+        static const std::string SLS_GAIN_MODE_FORCESWITCHG1 = "forceswitchg1"; 
+        static const std::string SLS_GAIN_MODE_FORCESWITCHG2 = "forceswitchg2"; 
+
         /***********************************************************************
          * \class Camera
          * \brief Hardware control object interface
@@ -79,6 +88,18 @@ namespace lima
             enum ClockDivider
             {
                 FullSpeed, HalfSpeed, QuarterSpeed, SuperSlowSpeed,
+            };
+
+            // gain mode values
+            enum GainMode 
+            { 
+                dynamic   = 0,
+                dynamichg0   ,
+                fixgain1     ,
+                fixgain2     ,
+                forceswitchg1,
+                forceswitchg2,
+                undefined   ,
             };
 
             //==================================================================
@@ -274,6 +295,15 @@ namespace lima
                 // Sets the delay after trigger (in seconds)
                 void setDelayAfterTrigger(double in_delay_after_trigger);
 
+                //------------------------------------------------------------------
+                // gain mode management
+                //------------------------------------------------------------------
+                // Gets the gain mode
+                lima::SlsJungfrau::Camera::GainMode getGainMode(void);
+
+                // Sets the gain mode
+                void setGainMode(lima::SlsJungfrau::Camera::GainMode in_gain_mode);
+
             //==================================================================
             // Related to event control object
             //==================================================================
@@ -440,6 +470,12 @@ namespace lima
 
             // treshold energy
             int m_threshold_energy_eV; 
+
+            // gain mode 
+            Camera::GainMode m_gain_mode;
+
+            // gain mode label from sls sdk
+            std::string m_gain_mode_label;
 
             //------------------------------------------------------------------
             // main acquisition thread

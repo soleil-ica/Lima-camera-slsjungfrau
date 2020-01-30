@@ -68,6 +68,7 @@ Camera::Camera(const std::string & in_config_file_name   ,
     m_threshold_energy_eV = 0.0;
     m_status              = Camera::Idle; // important for the calls of updateTimes & updateTriggerData in the init method.
     m_clock_divider       = Camera::FullSpeed;
+    m_gain_mode           = Camera::undefined;
 
     m_readout_time_sec    = in_readout_time_sec   ;
     m_receiver_fifo_depth = in_receiver_fifo_depth;
@@ -1510,6 +1511,146 @@ void Camera::setDelayAfterTrigger(double in_delay_after_trigger)
     lima::AutoMutex sdk_mutex = sdkLock(); 
 
     m_detector_control->setDelayAfterTrigger(in_delay_after_trigger, true); // in seconds
+}
+
+//------------------------------------------------------------------
+// gain mode management
+//------------------------------------------------------------------
+/*******************************************************************
+ * \brief Gets the gain mode
+ * \return gain mode
+ *******************************************************************/
+lima::SlsJungfrau::Camera::GainMode Camera::getGainMode(void)
+{
+    DEB_MEMBER_FUNCT();
+
+    // during acquisition, camera data access is not allowed because it
+    // could put the camera into an error state. 
+    // So we give the latest read value.
+    if(m_status == Camera::Idle)
+    {
+        // protecting the sdk concurrent access
+        {
+            lima::AutoMutex sdk_mutex = sdkLock(); 
+
+            // getting the current gain mode index
+            int gain_mode_index = m_detector_control->setSettings(SLS_GET_VALUE);
+
+            // converting gain mode index to gain mode label
+            m_gain_mode_label = slsDetectorUsers::getDetectorSettings(gain_mode_index);
+        }
+
+        // computing the trigger mode
+        if(m_gain_mode_label == SLS_GAIN_MODE_UNDEFINED)
+        {
+            m_gain_mode = Camera::undefined;
+        }
+        else
+        if(m_gain_mode_label == SLS_GAIN_MODE_DYNAMIC)
+        {
+            m_gain_mode = Camera::dynamic;
+        }
+        else
+        if(m_gain_mode_label == SLS_GAIN_MODE_DYNAMICHG0)
+        {
+            m_gain_mode = Camera::dynamichg0;
+        }
+        else
+        if(m_gain_mode_label == SLS_GAIN_MODE_FIXGAIN1)
+        {
+            m_gain_mode = Camera::fixgain1;
+        }
+        else
+        if(m_gain_mode_label == SLS_GAIN_MODE_FIXGAIN2)
+        {
+            m_gain_mode = Camera::fixgain2;
+        }
+        else
+        if(m_gain_mode_label == SLS_GAIN_MODE_FORCESWITCHG1)
+        {
+            m_gain_mode = Camera::forceswitchg1;
+        }
+        else
+        if(m_gain_mode_label == SLS_GAIN_MODE_FORCESWITCHG2)
+        {
+            m_gain_mode = Camera::forceswitchg2;
+        }
+        else
+        {
+            THROW_HW_ERROR(ErrorType::Error) << "getGainMode : This camera gain mode is not managed: (" << m_gain_mode_label << ")";
+        }
+    }
+
+    return m_gain_mode;
+}
+
+/*******************************************************************
+ * \brief Sets the gain mode
+ * \param in_gain_mode needed gain mode 
+ *******************************************************************/
+void Camera::setGainMode(lima::SlsJungfrau::Camera::GainMode in_gain_mode)
+{
+    DEB_MEMBER_FUNCT();
+
+    // converting the detector gain mode to the sdk gain mode
+    std::string gain_mode;
+
+    switch (in_gain_mode)
+    {       
+        case Camera::dynamic:
+            gain_mode = SLS_GAIN_MODE_DYNAMIC;
+            break;
+
+        case Camera::dynamichg0:
+            gain_mode = SLS_GAIN_MODE_DYNAMICHG0;
+            break;
+
+        case Camera::fixgain1:
+            gain_mode = SLS_GAIN_MODE_FIXGAIN1;
+            break;
+
+        case Camera::fixgain2:
+            gain_mode = SLS_GAIN_MODE_FIXGAIN2;
+            break;
+
+        case Camera::forceswitchg1:
+            gain_mode = SLS_GAIN_MODE_FORCESWITCHG1;
+            break;
+
+        case Camera::forceswitchg2:
+            gain_mode = SLS_GAIN_MODE_FORCESWITCHG2;
+            break;
+
+        default:
+            THROW_HW_ERROR(ErrorType::Error) << "setGainMode : Cannot change the Trigger mode of the camera, this mode is not managed: (" << in_gain_mode << ")";
+            break;
+    }
+
+    // protecting the sdk concurrent access
+    {
+        lima::AutoMutex sdk_mutex = sdkLock(); 
+
+        // conversion of gain mode label to gain mode index
+        int gain_mode_index = slsDetectorUsers::getDetectorSettings(gain_mode);
+
+        if(gain_mode_index == -1)
+        {
+            THROW_HW_ERROR(ErrorType::Error) << "setGainMode failed!";
+        }
+
+        // setting the current gain mode index and loading the settings (trimbits, dacs, iodelay etc) to the detector
+        DEB_TRACE() << "setGainMode  " << gain_mode_index;
+
+        int result = m_detector_control->setSettings(gain_mode_index);
+
+        if(result == slsDetectorDefs::FAIL)
+        {
+            THROW_HW_ERROR(ErrorType::Error) << "setGainMode failed!";
+        }
+    }
+
+    // updating the internal data
+    getGainMode();
 }
 
 //==================================================================
