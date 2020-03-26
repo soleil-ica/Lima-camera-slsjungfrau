@@ -100,6 +100,11 @@ namespace lima
             void treatCompleteFrames(Timestamp        in_start_timestamp,
                                      StdBufferCbMgr & in_buffer_mgr     );
 
+            // build an intensity image in 24 bits
+            void buildIntensityImage(char *           out_dest_image     ,
+                                     const uint16_t * in_source_image    ,
+                                     const double *   in_intensity_coeffs);
+
         private :
             volatile bool m_force_stop;
 

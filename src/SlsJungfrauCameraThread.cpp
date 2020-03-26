@@ -159,6 +159,19 @@ void CameraThread::execStartAcq()
     // the thread is running a new acquisition (it frees the Camera::startAcq method)
     setStatus(CameraThread::Running);
 
+    // checking if we are running an acquisition which will build images with 24 bits intensities
+    if(m_cam.areGainCoeffsLoaded())
+    {
+        if(!m_cam.areIntensityCoeffsValid())
+        {
+            setStatus(CameraThread::Error);
+
+            std::string errorText = "Can not start the acquisition, you should calibrate the detector first!";
+            REPORT_EVENT(errorText);
+            return;
+        }
+    }
+
     // making an alias on buffer manager
     StdBufferCbMgr & buffer_mgr = m_cam.m_buffer_ctrl_obj.getBuffer();
 
@@ -192,7 +205,7 @@ void CameraThread::execStartAcq()
     // Main acquisition loop
     // m_force_stop can be set to true by the execStopAcq call to abort an acquisition
     // m_force_stop can be set to true also with an error hardware camera status
-    // the loop can also end if the number of 
+    // the loop can also end when all the frames are acquired
     while ((!m_force_stop)&&(m_cam.getNbAcquiredFrames() < m_cam.getInternalNbFrames()))
     {
         CameraFrames & frame_manager = m_cam.getFrameManager();
@@ -315,18 +328,49 @@ void CameraThread::treatCompleteFrames(Timestamp        in_start_timestamp,
     DEB_MEMBER_FUNCT();
 
     CameraFrames & frame_manager = m_cam.getFrameManager();
-    CameraFrame    complete_frame;
 
-    // getting the first complete frame from complete frames container
-    while(frame_manager.getFirstComplete(complete_frame))
+    // checking if there is a complete frame available
+    while(frame_manager.completeAvailable())
     {
         HwFrameInfoType frame_info;
         double frame_timestamp_sec;
 
-        frame_info.acq_frame_nb = complete_frame.getIndex();
+        {
+            // getting a reference to the first complete frame from complete frames container
+            const CameraFrame & complete_frame = frame_manager.getFirstComplete();
 
-        // converting the timestamp which is in 10MHz to seconds
-        frame_timestamp_sec = static_cast<double>(complete_frame.getTimestamp()) / 10000000.0;
+            frame_info.acq_frame_nb = complete_frame.getIndex();
+
+            // converting the timestamp which is in 10MHz to seconds
+            frame_timestamp_sec = static_cast<double>(complete_frame.getTimestamp()) / 10000000.0;
+
+            // do we need to build a 24 bits intensity image ?
+            if(m_cam.areGainCoeffsLoaded())
+            {
+                lima::FrameDim frame_dim = in_buffer_mgr.getFrameDim();
+
+                // checking the frame size 
+                int         mem_size  = frame_dim.getMemSize();
+                std::size_t data_size = m_cam.m_width * m_cam.m_height * 3; // 24 bits -> 3 bytes
+
+                if(mem_size != data_size)
+                {
+                    DEB_TRACE() << "Incoherent sizes during frame build process : " << 
+                                   "frame size (" << data_size << ")" <<
+                                   "lima size ("  << mem_size  << ")";
+
+                    return;
+                }
+
+                // build the frame
+                char * dest_buffer = static_cast<char *>(in_buffer_mgr.getFrameBufferPtr(frame_info.acq_frame_nb));
+
+                // getting access to the image in the complete frame
+                const std::vector<uint16_t> & image = complete_frame.getImage();
+
+                buildIntensityImage(dest_buffer, image.data(),  m_cam.m_intensity_coeffs.data());
+            }
+        }
 
     #ifdef CAMERA_THREAD_USE_ABSOLUTE_TIMESTAMP
         frame_info.frame_timestamp = in_start_timestamp + Timestamp(frame_timestamp_sec);
@@ -340,6 +384,37 @@ void CameraThread::treatCompleteFrames(Timestamp        in_start_timestamp,
 
         // the complete frame has been treated, so we move it to the final container
         frame_manager.moveFirstCompleteToTreated();
+    }
+}
+
+/************************************************************************
+ * \brief build an intensity image in 24 bits
+ * \param out_dest_buffer : destination image buffer (32 bits)
+ * \param in_source_image : source image buffer (16 bits)
+ * \param in_intensity_coeffs : container used to store the dark images and gain coefficients for each gain type 
+************************************************************************/
+void CameraThread::buildIntensityImage(char *           out_dest_image     ,
+                                       const uint16_t * in_source_image    ,
+                                       const double *   in_intensity_coeffs)
+{
+    uint32_t nb = m_cam.m_width * m_cam.m_height;
+    uint32_t intensity;
+    
+    while(nb--)
+    {
+        // compute the position for the gain index in the pixel
+        in_intensity_coeffs += (2 * SLS_GET_GAIN_FROM_PIXEL(*in_source_image));
+        
+        // compute the intensity (adu - dark) * gain coeff
+        intensity = static_cast<uint32_t>(((static_cast<double>(SLS_GET_ADU_FROM_PIXEL(*in_source_image)) - *in_intensity_coeffs) * (*(in_intensity_coeffs + 1)) + 0.5));
+
+        *out_dest_image++ = (intensity & 0x00FF0000) >> 16;
+        *out_dest_image++ = (intensity & 0x0000FF00) >> 8 ;
+        *out_dest_image++ = (intensity & 0x000000FF);
+
+        // compute the position for the first gain index of the next pixel
+        in_intensity_coeffs += (2 * (3 - SLS_GET_GAIN_FROM_PIXEL(*in_source_image)));
+        in_source_image++;
     }
 }
 
