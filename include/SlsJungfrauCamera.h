@@ -455,9 +455,18 @@ namespace lima
                                        unsigned short in_width ,
                                        unsigned short in_height);
 
+                // Erases a dark image file
+                bool eraseDarkImageFile(const std::string & in_file_name) const;
+
                 // Saves a dark image from a file
                 bool saveDarkImageFile(const std::string & in_file_name,
                                        const std::vector<uint16_t> & in_pedestal_image) const;
+
+                // reset the previous dark images in memory and erase the files
+                void resetDarkImageFile();
+
+                // update the dark images memory data
+                void updateDarkImagesData();
 
             //==================================================================
             // Related to the computing of the intensity coeffs buffer
@@ -465,8 +474,11 @@ namespace lima
                 // Updates the intensity coeffs buffer (init or dark images change)
                 bool updateIntensityCoeffs(void);
 
-                 // Checks if the intensity coeffs buffer is valid
+                // Checks if the intensity coeffs buffer is valid
                 bool areIntensityCoeffsValid(void) const;
+
+                // reset the intensity coeffs
+                void resetIntensityCoeffs(void);
 
             //------------------------------------------------------------------
             // acquisition configuration backup and restoration

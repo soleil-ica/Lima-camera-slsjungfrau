@@ -499,7 +499,7 @@ void Camera::acquisitionDataReady(const int      in_receiver_index,
             // ckecking if there is no packet lost.
             if(in_packet_number == m_frame_packet_number)
             {
-                uint64_t relative_timestamp = m_frames_manager.computeRelativeTimestamp(in_timestamp  );
+                uint64_t relative_timestamp = m_frames_manager.computeRelativeTimestamp(in_timestamp);
 
                 // giving the frame to the frames manager
                 CameraFrame frame(relative_frame_index, in_packet_number, relative_timestamp);
@@ -538,7 +538,7 @@ void Camera::acquisitionDataReady(const int      in_receiver_index,
                 // ckecking if there is no packet lost.
                 if(in_packet_number == m_frame_packet_number)
                 {
-                    uint64_t relative_timestamp = m_frames_manager.computeRelativeTimestamp (in_timestamp  );
+                    uint64_t relative_timestamp = m_frames_manager.computeRelativeTimestamp (in_timestamp);
 
                     // copying the frame
                     char * dest_buffer = static_cast<char *>(buffer_mgr.getFrameBufferPtr(relative_frame_index));
@@ -557,6 +557,7 @@ void Camera::acquisitionDataReady(const int      in_receiver_index,
         }
     }
     else
+    // calibration is running)
     {
         m_frames_manager.manageFirstFrameTreatment(in_frame_index, in_timestamp);
 
@@ -1910,6 +1911,12 @@ bool Camera::loadGainsCoeffsFile(const std::string & in_file_name,
                     gains_coeffs.resize(gain_size);
 
                     memcpy(&gains_coeffs[0], buffer + (gain_size * gains_index), gain_size * sizeof(double));
+
+                    // take the absolute value of the coefficients
+                    for(std::size_t coeff_index = 0 ; coeff_index < gain_size ; coeff_index++)
+                    {
+                        gains_coeffs[coeff_index] = fabs(gains_coeffs[coeff_index]);
+                    }
                 }
             }
             else
@@ -1949,6 +1956,9 @@ bool Camera::loadGainsCoeffsFile(const std::string & in_file_name,
  *******************************************************************/
 bool Camera::areGainCoeffsLoaded(void) const
 {
+    // protecting the concurrent access
+    lima::AutoMutex sdk_mutex = calibrationLock(); 
+
     return !m_gains_coeffs.empty();
 }
 
@@ -1969,6 +1979,9 @@ std::string Camera::getGainCoeffsState(void)
  *******************************************************************/
 void Camera::getGainCoeffsState(int in_gain_index, double * out_gain_coeffs)
 {
+    // protecting the concurrent access
+    lima::AutoMutex sdk_mutex = calibrationLock(); 
+
     if(in_gain_index < m_gains_coeffs.size())
     {
         memcpy(out_gain_coeffs, m_gains_coeffs[in_gain_index].data(), m_gains_coeffs[in_gain_index].size() * sizeof(double));
@@ -2037,11 +2050,11 @@ void Camera::getDarkImage(int in_gain_index, uint16_t * out_dark_image)
 
     if(in_gain_index < m_pedestal_images.size())
     {
-        memcpy(out_dark_image, m_pedestal_images[in_gain_index].data(), m_pedestal_images[in_gain_index].size() * sizeof(double));
+        memcpy(out_dark_image, m_pedestal_images[in_gain_index].data(), m_pedestal_images[in_gain_index].size() * sizeof(uint16_t));
     }
     else
     {
-        memset(out_dark_image, 0, m_width * m_height * sizeof(double));
+        memset(out_dark_image, 0, m_width * m_height * sizeof(uint16_t));
     }
 }
 
@@ -2092,7 +2105,7 @@ bool Camera::loadDarkImageFile(const std::string & in_file_name,
             {
                 out_pedestal_images.resize(out_pedestal_images.size() + 1);
                 std::vector<uint16_t> & pedestal_image = out_pedestal_images.back();
-                out_pedestal_images.resize(pixels_nb);
+                pedestal_image.resize(pixels_nb);
 
                 memcpy(pedestal_image.data(), buffer, pixels_nb * sizeof(uint16_t));
             }
@@ -2128,6 +2141,35 @@ bool Camera::loadDarkImageFile(const std::string & in_file_name,
 }
 
 /*******************************************************************
+ * \brief Erases a dark image file
+ * \param in_file_name complete file name to erase
+ * \return true if success, false if error
+ *******************************************************************/
+bool Camera::eraseDarkImageFile(const std::string & in_file_name) const
+{
+    DEB_MEMBER_FUNCT();
+
+    // delete the dark image
+    bool file_exist;
+
+    {
+        std::ifstream file(in_file_name);
+        file_exist = file;
+    }
+
+    if(file_exist)
+    {
+        if (remove(in_file_name.c_str()) != 0)
+        {
+            DEB_TRACE() << "remove of the previous dark image file " << in_file_name << " failed!";
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/*******************************************************************
  * \brief Saves a dark image from a file
  * \param in_file_name complete file name to save
  * \param in_pedestal_image container which contains the dark image
@@ -2139,23 +2181,12 @@ bool Camera::saveDarkImageFile(const std::string & in_file_name,
     DEB_MEMBER_FUNCT();
 
     // first, delete the previous dark image
-    bool file_exist;
-
+    if(!eraseDarkImageFile(in_file_name))
     {
-        std::ifstream file(in_file_name);
-        file_exist = file;
+        return false;
     }
 
-    if(file_exist)
-    {
-        if (remove(in_file_name.c_str()) !=0)
-        {
-            DEB_TRACE() << "remove of the previous dark image file " << in_file_name << " failed!";
-            return false;
-        }
-    }
-
-    bool        result = true;
+    bool result = true;
 
     DEB_TRACE() << "opening dark image file " << in_file_name << "...";
 
@@ -2192,6 +2223,45 @@ bool Camera::saveDarkImageFile(const std::string & in_file_name,
     return result;
 }
 
+/*******************************************************************
+ * \brief reset the previous dark images in memory and erase the files
+ *******************************************************************/
+void Camera::resetDarkImageFile()
+{
+    // protecting the concurrent access
+    lima::AutoMutex sdk_mutex = calibrationLock(); 
+
+    m_dark_images_loaded = false;
+    m_pedestal_images.clear();
+
+    for(std::size_t nb_darks = 0 ; nb_darks < m_pedestal_file_names.size() ; nb_darks++)
+    {
+        eraseDarkImageFile(m_pedestal_file_names[nb_darks]);
+    }
+}
+
+/*******************************************************************
+ * \brief update the dark images memory data
+ *******************************************************************/
+void Camera::updateDarkImagesData()
+{
+    // protecting the concurrent access
+    lima::AutoMutex sdk_mutex = calibrationLock(); 
+
+    std::size_t nb_dark_images = m_pedestal_images.size();
+
+    // check if the number of images in memory is correct
+    if(nb_dark_images == m_pedestal_file_names.size())
+    {
+        m_dark_images_loaded = true;
+    }
+    else
+    // a problem occured, we flush the dark images which could have been loaded or created in memory
+    {
+        m_pedestal_images.clear();
+    }
+}
+
 //==================================================================
 // Related to the computing of the intensity coeffs buffer
 //==================================================================
@@ -2210,6 +2280,7 @@ bool Camera::updateIntensityCoeffs(void)
         return false;
     }
 
+    // protecting the concurrent access
     lima::AutoMutex sdk_mutex = calibrationLock(); 
 
     // checking the dark images
@@ -2222,12 +2293,18 @@ bool Camera::updateIntensityCoeffs(void)
     }
     
     // the intensity coeffs buffer will contain dark image and gain coeffs data :
-    // [Pixel0][dark0|gain0|dark1|gain1|dark2|gain2]...[Pixeli][dark0|gain0|dark1|gain1|dark2|gain2]
+    // [Pixel0][dark0|gain0|dark1|gain1|empty|empty|dark2|gain2]...[Pixeli][dark0|gain0|dark1|gain1|dark2|gain2]
+    // in the pixel of the detector, the value for the gain 0 is 0 
+    // in the pixel of the detector, the value for the gain 1 is 1 
+    // in the pixel of the detector, the value for the gain 2 is 3!
     const int pixels_nb         = m_width * m_height;
-    const int data_nb_per_pixel = SLS_NUMBER_OF_DARK_IMAGES * 2;
+    const int data_nb_per_pixel = (SLS_NUMBER_OF_DARK_IMAGES + 1) * 2; // +1 to add empty space between gain 1 and gain 2
 
     m_intensity_coeffs.clear();
     m_intensity_coeffs.resize(pixels_nb * data_nb_per_pixel);
+    memset(m_intensity_coeffs.data(), 0, sizeof(double) * m_intensity_coeffs.size());
+
+    const int gain_position[SLS_NUMBER_OF_DARK_IMAGES] = {0, 2, 6};
 
     for(int gain_index = 0 ; gain_index < m_gains_coeffs.size() ; gain_index++)
     {
@@ -2236,7 +2313,7 @@ bool Camera::updateIntensityCoeffs(void)
 
         for(int pixel_index = 0 ; pixel_index < pixels_nb ; pixel_index++)
         {
-            const int pos = (pixel_index * data_nb_per_pixel) + (gain_index * 2);
+            const int pos = (pixel_index * data_nb_per_pixel) + gain_position[gain_index];
             
             // first of all, store the dark image pixel
             m_intensity_coeffs[pos] = static_cast<double>(pedestal_image[pixel_index]);
@@ -2253,7 +2330,21 @@ bool Camera::updateIntensityCoeffs(void)
  *******************************************************************/
 bool Camera::areIntensityCoeffsValid(void) const
 {
+    // protecting the concurrent access
+    lima::AutoMutex sdk_mutex = calibrationLock(); 
+
     return !m_intensity_coeffs.empty();
+}
+
+/*******************************************************************
+ * \brief reset the intensity coeffs
+ *******************************************************************/
+void Camera::resetIntensityCoeffs(void)
+{
+    // protecting the concurrent access
+    lima::AutoMutex sdk_mutex = calibrationLock(); 
+
+    m_intensity_coeffs.clear();
 }
 
 //==================================================================

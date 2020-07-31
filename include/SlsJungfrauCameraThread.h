@@ -101,9 +101,9 @@ namespace lima
                                      StdBufferCbMgr & in_buffer_mgr     );
 
             // build an intensity image in 24 bits
-            void buildIntensityImage(char *           out_dest_image     ,
+            void buildIntensityImage(uint32_t       * out_dest_image     ,
                                      const uint16_t * in_source_image    ,
-                                     const double *   in_intensity_coeffs);
+                                     const double   * in_intensity_coeffs);
 
         private :
             volatile bool m_force_stop;

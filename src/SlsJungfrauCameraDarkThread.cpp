@@ -155,14 +155,11 @@ void CameraDarkThread::execStartCalibration()
     // the thread is running a new calibration (it frees the Camera::startCalibration method)
     setStatus(CameraDarkThread::Running);
 
-    // reset the previous dark images
-    {
-        // protecting the concurrent access
-        lima::AutoMutex sdk_mutex = m_cam.calibrationLock();
+    // reset the previous dark images and erase the files
+    m_cam.resetDarkImageFile();
 
-        m_cam.m_dark_images_loaded = false;
-        m_cam.m_pedestal_images.clear();
-    }
+    // reset the intensity coeffs
+    m_cam.resetIntensityCoeffs();
 
     // backup the current acquisition configuration
     Camera::CameraAcqConf backup_configuration;
@@ -196,6 +193,13 @@ void CameraDarkThread::execStartCalibration()
         }
     }
 
+    // if there was a problem during the dark images creation, we reset the dark images which could have been created
+    // and also we erase the created files
+    if(problem_occured)
+    {
+        m_cam.resetDarkImageFile();
+    }
+
     // restore the acquisition configuration
     if(!m_cam.setAcqConf(backup_configuration))
     {
@@ -222,6 +226,9 @@ void CameraDarkThread::execStartCalibration()
         REPORT_EVENT(tempStream.str());
         return;
     }
+
+    // update the dark images
+    m_cam.updateDarkImagesData();
 
     // rebuild the intensity coeffs buffer
     m_cam.updateIntensityCoeffs();
