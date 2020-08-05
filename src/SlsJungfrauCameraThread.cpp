@@ -351,7 +351,7 @@ void CameraThread::treatCompleteFrames(Timestamp        in_start_timestamp,
 
                 // checking the frame size 
                 int         mem_size  = frame_dim.getMemSize();
-                std::size_t data_size = m_cam.m_width * m_cam.m_height * 4; // 24 bits store into 32 bits -> 4 bytes
+                std::size_t data_size = m_cam.m_width * m_cam.m_height * 4; // 24 bits stored into 32 bits -> 4 bytes
 
                 if(mem_size != data_size)
                 {
@@ -397,44 +397,25 @@ void CameraThread::buildIntensityImage(uint32_t       * out_dest_image     ,
                                        const uint16_t * in_source_image    ,
                                        const double   * in_intensity_coeffs)
 {
-DEB_MEMBER_FUNCT();
-
     uint32_t nb = m_cam.m_width * m_cam.m_height;
     uint32_t intensity;
     double   temp;
     
-uint32_t i = 0;
-
     while(nb--)
     {
         // compute the position for the gain index in the pixel
         in_intensity_coeffs += (2 * SLS_GET_GAIN_FROM_PIXEL(*in_source_image));
 
         // compute the intensity (adu - dark) * gain coeff
-        temp      = (static_cast<double>(SLS_GET_ADU_FROM_PIXEL(*in_source_image)) - *in_intensity_coeffs) * (*(in_intensity_coeffs + 1)) + 0.5;
-double   temp2 = temp;
-        temp      = fmax(temp, 0); // removing negative numbers
-        intensity = static_cast<uint32_t>(temp);
+        temp = (static_cast<double>(SLS_GET_ADU_FROM_PIXEL(*in_source_image)) - (*in_intensity_coeffs)) * (*(in_intensity_coeffs + 1));
+
+        // removing negative numbers
+        temp = fmax(temp, 0);
+
+        // conversion to 24 bits into 32 bits
+        intensity = static_cast<uint32_t>(temp + 0.5);
 
         *out_dest_image++ = intensity;
-
-if(SLS_GET_GAIN_FROM_PIXEL(*in_source_image) != 3)
-{
-    DEB_TRACE() << "-----------------";
-    DEB_TRACE() << "in_source_image = " << *in_source_image;
-    DEB_TRACE() << "gain (" << i << ")= " << SLS_GET_GAIN_FROM_PIXEL(*in_source_image);
-    DEB_TRACE() << "adu (" << i << ")= " << SLS_GET_ADU_FROM_PIXEL(*in_source_image);
-    DEB_TRACE() << "dark = " << *in_intensity_coeffs;
-    DEB_TRACE() << "coeff = " << *(in_intensity_coeffs + 1);
-    DEB_TRACE() << "temp2 = " << temp2;
-    DEB_TRACE() << "intensity = " << intensity;
-}
-i++;
-/*      
-        *out_dest_image++ = (intensity & 0x00FF0000) >> 16;
-        *out_dest_image++ = (intensity & 0x0000FF00) >> 8 ;
-        *out_dest_image++ = (intensity & 0x000000FF);
-*/
 
         // compute the position for the first gain index of the next pixel
         in_intensity_coeffs += (2 * (4 - SLS_GET_GAIN_FROM_PIXEL(*in_source_image)));

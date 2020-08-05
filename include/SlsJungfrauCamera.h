@@ -37,6 +37,7 @@
 #include "lima/HwBufferMgr.h"
 #include "lima/ThreadUtils.h"
 #include "lima/HwSyncCtrlObj.h"
+#include "lima/HwMaxImageSizeCallback.h"
 #include "SlsJungfrauCameraThread.h"
 #include "SlsJungfrauCameraDarkThread.h"
 #include "SlsJungfrauCameraFrames.h"
@@ -135,9 +136,7 @@ namespace lima
                    const long                     in_frame_packet_number   ,  // Number of packets we should get in each receiver frame
                    const std::string &            in_gains_coeffs_file_name,  // complete path of the gains coefficients file
                    const std::vector<std::string> in_pedestal_file_names   ,  // complete path of the pedestal images
-                   const std::vector<long>        in_pedestal_nb_frames    ,  // number of frames used to generate the pedestal images
-                   const std::vector<double>      in_pedestal_exposures_sec,  // exposure time (in seconds) used to generate the pedestal images
-                   const std::vector<double>      in_pedestal_periods_sec  ); // exposure period (in seconds) used to generate the pedestal images
+                   const std::vector<long>        in_pedestal_nb_frames    ); // number of frames used to generate the pedestal images
 
             // destructor (no need to be virtual)
             ~Camera();
@@ -201,6 +200,9 @@ namespace lima
                 // Gets the image height
                 unsigned short getHeight() const;
 
+                // Gets the detector image size
+                void getDetectorImageSize(Size& size);
+
                 //------------------------------------------------------------------
                 // current image type management
                 //------------------------------------------------------------------
@@ -209,6 +211,9 @@ namespace lima
 
                 // gets the current image type
                 lima::ImageType getImageType() const;
+
+                // gets the current image type
+                void getImageType(ImageType& type) const;
 
                 // sets the current image type
                 void setImageType(lima::ImageType in_type);
@@ -346,6 +351,9 @@ namespace lima
             //------------------------------------------------------------------
             // Related to the calibration process
             //------------------------------------------------------------------
+                // set the exposure time and period used for the calibration
+                void setCalibrationExposureTimeAndPeriod(double in_pedestal_exposures_sec, double in_pedestal_periods_sec);
+
                 // Gets the calibration state
                 std::string getCalibrationState(void);
 
@@ -649,6 +657,9 @@ namespace lima
             // used to protect the concurrent access to the calibration data
             // mutable keyword is used to allow const methods even if they use this class member
             mutable lima::Cond m_calibration_cond;
+
+            // for the dynamic change of size or/and pixel depth
+            #include "SlsJungfrauImageSize.h"
         };
     }
 }

@@ -52,8 +52,6 @@ using namespace lima::SlsJungfrau;
  * \param in_gains_coeffs_file_name complete path of the gains coefficients file
  * \param in_pedestal_file_names complete path of the pedestal images
  * \param in_pedestal_nb_frames number of frames used to generate the pedestal images
- * \param in_pedestal_exposures_sec exposure time (in seconds) used to generate the pedestal images
- * \param in_pedestal_periods_sec exposure period (in seconds) used to generate the pedestal images
  ************************************************************************/
 Camera::Camera(const std::string &            in_config_file_name      ,
                const double                   in_readout_time_sec      ,
@@ -61,9 +59,7 @@ Camera::Camera(const std::string &            in_config_file_name      ,
                const long                     in_frame_packet_number   ,
                const std::string &            in_gains_coeffs_file_name,
                const std::vector<std::string> in_pedestal_file_names   ,
-               const std::vector<long>        in_pedestal_nb_frames    ,
-               const std::vector<double>      in_pedestal_exposures_sec,
-               const std::vector<double>      in_pedestal_periods_sec  ) : m_frames_manager(*this)
+               const std::vector<long>        in_pedestal_nb_frames    ) : m_frames_manager(*this)
 {
     DEB_CONSTRUCTOR();
 
@@ -89,8 +85,6 @@ Camera::Camera(const std::string &            in_config_file_name      ,
     m_gains_coeffs_file_name = in_gains_coeffs_file_name;
     m_pedestal_file_names    = in_pedestal_file_names;
     m_pedestal_nb_frames     = in_pedestal_nb_frames;  
-    m_pedestal_exposures_sec = in_pedestal_exposures_sec;
-    m_pedestal_periods_sec   = in_pedestal_periods_sec;
     m_calibration_running    = false;
     m_dark_images_loaded     = false;
 
@@ -844,6 +838,16 @@ unsigned short Camera::getHeight() const
     return m_height;
 }
 
+/*******************************************************************
+ * \brief Gets the detector image size
+ * \param size returned detector image size
+ *******************************************************************/
+void Camera::getDetectorImageSize(Size& size)
+{
+	DEB_MEMBER_FUNCT();
+    size = Size(getWidth(), getHeight());
+}
+
 //------------------------------------------------------------------
 // current image type management
 //------------------------------------------------------------------
@@ -894,6 +898,17 @@ lima::ImageType Camera::getImageType() const
 }
 
 /*******************************************************************
+ * \brief gets the current image type
+ * \param type new image type
+*******************************************************************/
+void Camera::getImageType(ImageType& type) const
+{
+	DEB_MEMBER_FUNCT();
+
+    type = getImageType();
+}
+
+/*******************************************************************
  * \brief sets the current image type
  * \param in_type new image type
  *******************************************************************/
@@ -906,9 +921,10 @@ void Camera::setImageType(lima::ImageType in_type)
     switch(in_type)
     {
         case lima::ImageType::Bpp16:
+        case lima::ImageType::Bpp24: 
             bit_depth = 16;
             break;
-        
+
         default:
             THROW_HW_ERROR(ErrorType::Error) << "This pixel format of the camera is not managed, only 16 bits cameras are managed!";
             break;
@@ -1911,12 +1927,6 @@ bool Camera::loadGainsCoeffsFile(const std::string & in_file_name,
                     gains_coeffs.resize(gain_size);
 
                     memcpy(&gains_coeffs[0], buffer + (gain_size * gains_index), gain_size * sizeof(double));
-
-                    // take the absolute value of the coefficients
-                    for(std::size_t coeff_index = 0 ; coeff_index < gain_size ; coeff_index++)
-                    {
-                        gains_coeffs[coeff_index] = fabs(gains_coeffs[coeff_index]);
-                    }
                 }
             }
             else
@@ -1995,6 +2005,26 @@ void Camera::getGainCoeffsState(int in_gain_index, double * out_gain_coeffs)
 //==================================================================
 // Related to the calibration process
 //==================================================================
+/*******************************************************************
+ * \brief set the exposure time and period used for the calibration
+ * \param[in] in_pedestal_exposures_sec pedestal exposure time in seconds
+ * \param[in] in_pedestal_periods_sec pedestal period in seconds
+ *******************************************************************/
+void Camera::setCalibrationExposureTimeAndPeriod(double in_pedestal_exposures_sec, double in_pedestal_periods_sec)
+{
+    // protecting the concurrent access
+    lima::AutoMutex sdk_mutex = calibrationLock(); 
+
+    m_pedestal_exposures_sec.clear();
+    m_pedestal_periods_sec.clear  ();
+
+    for(std::size_t nb_darks = 0 ; nb_darks < m_pedestal_file_names.size() ; nb_darks++)
+    {
+        m_pedestal_exposures_sec.push_back(in_pedestal_exposures_sec);
+        m_pedestal_periods_sec.push_back  (in_pedestal_periods_sec  );
+    }
+}
+
 /*******************************************************************
  * \brief Gets the calibration state
  * \return the state
