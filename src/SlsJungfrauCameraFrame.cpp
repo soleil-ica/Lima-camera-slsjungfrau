@@ -28,6 +28,7 @@
 */
 /*************************************************************************************/
 
+#include <string.h>
 #include "SlsJungfrauCameraFrame.h"
 
 using namespace lima::SlsJungfrau;
@@ -82,6 +83,36 @@ uint32_t CameraFrame::getPacketNumber() const
 uint64_t CameraFrame::getTimestamp() const
 {
     return m_timestamp;
+}
+
+/************************************************************************
+ * \brief fill the internal image
+ * \param in_data_pointer frame image pointer
+ * \param in_data_size frame image size 
+ ************************************************************************/
+void CameraFrame::setImage(const char *   in_data_pointer,
+                           const uint32_t in_data_size   )
+{
+    m_image.resize(in_data_size / sizeof(uint16_t));
+    memcpy(m_image.data(), in_data_pointer, in_data_size);
+}
+
+/************************************************************************
+ * \brief clear the internal image to free the memory
+ * \return none
+ ************************************************************************/
+void CameraFrame::clearImage()
+{
+    m_image.clear();
+}
+
+/************************************************************************
+ * \brief get a reference to the internal image
+ * \return reference to the internal image
+ ************************************************************************/
+const std::vector<uint16_t> & CameraFrame::getImage() const
+{
+    return m_image;
 }
 
 //========================================================================================

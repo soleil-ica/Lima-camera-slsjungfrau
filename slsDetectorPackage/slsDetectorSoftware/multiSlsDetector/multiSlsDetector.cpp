@@ -2899,10 +2899,12 @@ slsDetectorDefs::externalCommunicationMode multiSlsDetector::setExternalCommunic
 	externalCommunicationMode ret, ret1;
 	//(Dhanya) FIXME: why first detector or is it the master one?
 	if (detectors.size())
+    {
 		ret = detectors[0]->setExternalCommunicationMode(pol);
-	if (detectors[0]->getErrorMask())
-		setErrorMask(getErrorMask() | (1 << 0));
-
+        if (detectors[0]->getErrorMask())
+            setErrorMask(getErrorMask() | (1 << 0));
+    }
+    
 	for (unsigned int idet = 1; idet < detectors.size(); ++idet) {
 		ret1 = detectors[idet]->setExternalCommunicationMode(pol);
 		if (detectors[idet]->getErrorMask())

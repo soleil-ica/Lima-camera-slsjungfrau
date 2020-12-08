@@ -37,7 +37,9 @@
 #include "lima/HwBufferMgr.h"
 #include "lima/ThreadUtils.h"
 #include "lima/HwSyncCtrlObj.h"
+#include "lima/HwMaxImageSizeCallback.h"
 #include "SlsJungfrauCameraThread.h"
+#include "SlsJungfrauCameraDarkThread.h"
 #include "SlsJungfrauCameraFrames.h"
 #include "SlsJungfrauCameraReceivers.h"
 
@@ -55,6 +57,27 @@ namespace lima
         static const std::string SLS_TRIGGER_MODE_AUTO    = "auto"   ; // there is no triggers enums in the current sls sdk
         static const std::string SLS_TRIGGER_MODE_TRIGGER = "trigger"; // there is no triggers enums in the current sls sdk
 
+        // gain coefficients state
+        static const std::string SLS_GAIN_COEFFS_STATE_NOT_LOADED = "NONE"  ; 
+        static const std::string SLS_GAIN_COEFFS_STATE_LOADED     = "LOADED"; 
+
+        // calibration state
+        static const std::string SLS_CALIBRATION_STATE_NONE        = "NONE"       ; // no calibration loaded or generated
+        static const std::string SLS_CALIBRATION_STATE_LOADED      = "LOADED"     ; // a previous saved calibration was loaded
+        static const std::string SLS_CALIBRATION_STATE_RUNNING_0_3 = "RUNNING_0_3"; // a calibration is running and at the moment no pedestal was generated
+        static const std::string SLS_CALIBRATION_STATE_RUNNING_1_3 = "RUNNING_1_3"; // a calibration is running and the first pedestal was generated
+        static const std::string SLS_CALIBRATION_STATE_RUNNING_2_3 = "RUNNING_2_3"; // a calibration is running and two pedestals were generated
+        static const std::string SLS_CALIBRATION_STATE_GENERATED   = "GENERATED"  ; // a new calibration was done
+
+        // number of dark images used to build the final image
+        static const int SLS_NUMBER_OF_DARK_IMAGES = 3;
+
+        // get the adu from a image pixel (remove the gain part)
+        #define SLS_GET_ADU_FROM_PIXEL(pixel) ((pixel) & 0x3FFF)
+
+        // get the gain from a image pixel (remove the adu part)
+        #define SLS_GET_GAIN_FROM_PIXEL(pixel) ((pixel) >> 14)
+
         /***********************************************************************
          * \class Camera
          * \brief Hardware control object interface
@@ -69,10 +92,11 @@ namespace lima
             // status values
             enum Status
             {
-                Idle   , // ready to start acquisition
-                Waiting, // waiting for trigger or gate signal  
-                Running, // acquisition is running 
-                Error  , // acquisition stopped externally, fifo full or unexpected error 
+                Idle       , // ready to start acquisition
+                Waiting    , // waiting for trigger or gate signal  
+                Running    , // acquisition is running 
+                Error      , // acquisition stopped externally, fifo full or unexpected error 
+                Calibration, // calibration is running 
             };
 
             // clock divider values
@@ -81,12 +105,38 @@ namespace lima
                 FullSpeed, HalfSpeed, QuarterSpeed, SuperSlowSpeed,
             };
 
+            // gain mode values
+            enum GainMode 
+            { 
+                dynamic   = 0,
+                dynamichg0   ,
+                fixgain1     ,
+                fixgain2     ,
+                forceswitchg1,
+                forceswitchg2,
+                undefined   ,
+            };
+
+            // structure used for the backup and the restoration of several acquisition configuration data 
+            struct CameraAcqConf
+            {
+                int64_t m_nb_frames_per_cycle;
+                int64_t m_nb_cycles          ;
+                int     m_trigger_mode       ;
+                double  m_exposures_sec      ;
+                double  m_periods_sec        ;
+                int     m_gain_mode          ;
+            };
+
             //==================================================================
             // constructor
-            Camera(const std::string & in_config_file_name   ,  // complete path to the configuration file
-                   const double        in_readout_time_sec   ,  // readout time in seconds
-                   const long          in_receiver_fifo_depth,  // Number of frames in the receiver memory
-                   const long          in_frame_packet_number); // Number of packets we should get in each receiver frame
+            Camera(const std::string &            in_config_file_name      ,  // complete path to the configuration file
+                   const double                   in_readout_time_sec      ,  // readout time in seconds
+                   const long                     in_receiver_fifo_depth   ,  // Number of frames in the receiver memory
+                   const long                     in_frame_packet_number   ,  // Number of packets we should get in each receiver frame
+                   const std::string &            in_gains_coeffs_file_name,  // complete path of the gains coefficients file
+                   const std::vector<std::string> in_pedestal_file_names   ,  // complete path of the pedestal images
+                   const std::vector<long>        in_pedestal_nb_frames    ); // number of frames used to generate the pedestal images
 
             // destructor (no need to be virtual)
             ~Camera();
@@ -150,6 +200,9 @@ namespace lima
                 // Gets the image height
                 unsigned short getHeight() const;
 
+                // Gets the detector image size
+                void getDetectorImageSize(Size& size);
+
                 //------------------------------------------------------------------
                 // current image type management
                 //------------------------------------------------------------------
@@ -158,6 +211,9 @@ namespace lima
 
                 // gets the current image type
                 lima::ImageType getImageType() const;
+
+                // gets the current image type
+                void getImageType(ImageType& type) const;
 
                 // sets the current image type
                 void setImageType(lima::ImageType in_type);
@@ -274,6 +330,39 @@ namespace lima
                 // Sets the delay after trigger (in seconds)
                 void setDelayAfterTrigger(double in_delay_after_trigger);
 
+                //------------------------------------------------------------------
+                // gain mode management
+                //------------------------------------------------------------------
+                // Gets the gain mode
+                lima::SlsJungfrau::Camera::GainMode getGainMode(void);
+
+                // Sets the gain mode
+                void setGainMode(lima::SlsJungfrau::Camera::GainMode in_gain_mode);
+
+                // tells if the gain coefficients were loaded
+                bool areGainCoeffsLoaded(void) const;
+
+                // Gets the gain coefficients state
+                std::string getGainCoeffsState(void);
+
+                // Gets the coefficients for a gain type
+                void getGainCoeffsState(int in_gain_index, double * out_gain_coeffs);
+
+            //------------------------------------------------------------------
+            // Related to the calibration process
+            //------------------------------------------------------------------
+                // set the exposure time and period used for the calibration
+                void setCalibrationExposureTimeAndPeriod(double in_pedestal_exposures_sec, double in_pedestal_periods_sec);
+
+                // Gets the calibration state
+                std::string getCalibrationState(void);
+
+                // Gets a dark image
+                void getDarkImage(int in_gain_index, uint16_t * out_dark_image);
+
+                // starts the calibration
+                void startCalibration();
+
             //==================================================================
             // Related to event control object
             //==================================================================
@@ -295,6 +384,9 @@ namespace lima
 
                 // creates an autolock mutex for sdk methods access
                 lima::AutoMutex sdkLock() const;
+
+                // creates an autolock mutex for calibration data access
+                lima::AutoMutex calibrationLock() const;
 
                 // Updates exposure & latency times using camera data 
                 void updateTimes();
@@ -334,14 +426,80 @@ namespace lima
                 // stop detector real time acquisition
                 int stopAcquisition();
 
+                // stops the acquisition and abort or restart the acq thread if it is in error
+                // can also abort the thread when we exit the program.
+                void applyStopAcq(bool in_restart, bool in_always_abort);
+
+            //------------------------------------------------------------------
+            // calibration management
+            //------------------------------------------------------------------
+                // stops the calibration
+                void stopCalibration();
+
+                // stops the calibration and abort or restart the thread
+                void applyStopCalibration(bool in_restart, bool in_always_abort);
+
             //------------------------------------------------------------------
             // status management
             //------------------------------------------------------------------
                 // returns the current detector status
                 Camera::Status getDetectorStatus();
 
+            //------------------------------------------------------------------
+            // gain management
+            //------------------------------------------------------------------
+                // Loads the gains'coefficients file
+                bool loadGainsCoeffsFile(const std::string & in_file_name,
+                                         std::vector<std::vector<double>> & out_gains_coeffs,
+                                         unsigned short in_width ,
+                                         unsigned short in_height);
+
+            //------------------------------------------------------------------
+            // Related to the calibration process
+            //------------------------------------------------------------------
+                // Loads a dark image from a file
+                bool loadDarkImageFile(const std::string & in_file_name,
+                                       std::vector<std::vector<uint16_t>> & out_pedestal_images,
+                                       unsigned short in_width ,
+                                       unsigned short in_height);
+
+                // Erases a dark image file
+                bool eraseDarkImageFile(const std::string & in_file_name) const;
+
+                // Saves a dark image from a file
+                bool saveDarkImageFile(const std::string & in_file_name,
+                                       const std::vector<uint16_t> & in_pedestal_image) const;
+
+                // reset the previous dark images in memory and erase the files
+                void resetDarkImageFile();
+
+                // update the dark images memory data
+                void updateDarkImagesData();
+
+            //==================================================================
+            // Related to the computing of the intensity coeffs buffer
+            //==================================================================
+                // Updates the intensity coeffs buffer (init or dark images change)
+                bool updateIntensityCoeffs(void);
+
+                // Checks if the intensity coeffs buffer is valid
+                bool areIntensityCoeffsValid(void) const;
+
+                // reset the intensity coeffs
+                void resetIntensityCoeffs(void);
+
+            //------------------------------------------------------------------
+            // acquisition configuration backup and restoration
+            //------------------------------------------------------------------
+                // Gets the acquisition configuration
+                bool getAcqConf(Camera::CameraAcqConf & out_configuration) const;
+
+                // Gets the acquisition configuration
+                bool setAcqConf(const Camera::CameraAcqConf in_configuration);
+
         private:
-            friend class CameraThread; // for getFrameManager(), getInternalNbFrames() and m_buffer_ctrl_obj accesses
+            friend class CameraThread    ; // for getFrameManager(), getInternalNbFrames() and m_buffer_ctrl_obj accesses
+            friend class CameraDarkThread; // for getFrameManager()
 
             //------------------------------------------------------------------
             // Lima event control object
@@ -437,10 +595,52 @@ namespace lima
             // treshold energy
             int m_threshold_energy_eV; 
 
+            // gain mode 
+            Camera::GainMode m_gain_mode;
+
+            // complete path of the gains coefficients file
+            std::string m_gains_coeffs_file_name;
+
+            // gains coefficients
+            std::vector<std::vector<double>> m_gains_coeffs;
+
+            // complete path of the pedestal images
+            std::vector<std::string> m_pedestal_file_names;
+
+            // number of frames used to generate the pedestal images
+            std::vector<long>        m_pedestal_nb_frames;  
+            
+            // exposure time (in seconds) used to generate the pedestal images
+            std::vector<double>      m_pedestal_exposures_sec;
+            
+            // exposure period (in seconds) used to generate the pedestal images
+            std::vector<double>      m_pedestal_periods_sec;
+
+            // container used to store the 16 bits dark images for each gain type
+            std::vector<std::vector<uint16_t>> m_pedestal_images;
+
+            // tells if the dark images were loaded during the init
+            bool m_dark_images_loaded;
+
+            // tells if a calibration is running (used for the acquisition callback)
+            bool m_calibration_running;
+
+            // container used to store the dark images and gain coefficients for each gain type (for each pixel)
+            // It contains the data used to compute the final intensity.
+            // Intensity = (adu - dark) * gain coefficient
+            // The dark and the gain coefficient which are used during the computing depend of the gain index.
+            // (Pixel0[ dark0 | gain0 | dark1 | gain1 | dark2 | gain2 ])...(Pixeli[ dark0 | gain0 | dark1 | gain1 | dark2| gain2 ])
+            std::vector<double> m_intensity_coeffs;
+
             //------------------------------------------------------------------
             // main acquisition thread
             //------------------------------------------------------------------
-            CameraThread m_thread;
+            CameraThread * m_thread;
+
+            //------------------------------------------------------------------
+            // calibration thread
+            //------------------------------------------------------------------
+            CameraDarkThread * m_dark_thread;
 
             //------------------------------------------------------------------
             // frames manager
@@ -453,6 +653,13 @@ namespace lima
             // used to protect the concurrent access to sdk methods
             // mutable keyword is used to allow const methods even if they use this class member
             mutable lima::Cond m_sdk_cond;
+
+            // used to protect the concurrent access to the calibration data
+            // mutable keyword is used to allow const methods even if they use this class member
+            mutable lima::Cond m_calibration_cond;
+
+            // for the dynamic change of size or/and pixel depth
+            #include "SlsJungfrauImageSize.h"
         };
     }
 }

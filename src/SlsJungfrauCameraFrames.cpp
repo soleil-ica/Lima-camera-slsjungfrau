@@ -62,9 +62,13 @@ CameraFrames::~CameraFrames()
  * \brief add a new received frame
  * \param m_receiver_index receiver index
  * \param in_frame frame instance to treat
+ * \param in_data_pointer frame image pointer (NULL if there is no buffer to copy)
+ * \param in_data_size frame image size (0 if there is no buffer to copy)
  ************************************************************************/
 void CameraFrames::addReceived(const int           in_receiver_index,
-                               const CameraFrame & in_frame         )
+                               const CameraFrame & in_frame         ,
+                               const char *        in_data_pointer  ,
+                               const uint32_t      in_data_size     )
 {
     DEB_MEMBER_FUNCT();
 
@@ -121,33 +125,45 @@ void CameraFrames::addReceived(const int           in_receiver_index,
 
         m_complete_frames.push_back(frame);
 
+        // fill the internal image of the frame
+        if(in_data_pointer != NULL)
+        {
+            CameraFrame & complete_frame = m_complete_frames.back();
+            complete_frame.setImage(in_data_pointer, in_data_size);
+        }
+
         // removing the frame from the received frame container
         m_received_frames.erase(received_search);
     }
 }
 
 /************************************************************************
- * \brief get the first complete frame from complete frames container
- *        It does not remove the frame from the container.
- * \param out_frame frame instance filled with frame data
- * \return true if a complete frame was treated by this method
+ * \brief tell if there is an available complete frame in the complete frames container
+ * \return true if a complete frame is available
  ************************************************************************/
-bool CameraFrames::getFirstComplete(CameraFrame & out_frame)
+bool CameraFrames::completeAvailable(void)
 {
     DEB_MEMBER_FUNCT();
-
-    bool result = false;
 
     // protecting the containers access
     lima::AutoMutex container_mutex = containersLock();
 
-    if(!m_complete_frames.empty())
-    {
-        out_frame = m_complete_frames.front();
-        result = true;
-    }
+    return (!m_complete_frames.empty());
+}
 
-    return result;
+/************************************************************************
+ * \brief get a reference to the first complete frame from complete frames container
+ *        It does not remove the frame from the container.
+ * \return reference to the first complete frame 
+ ************************************************************************/
+const CameraFrame & CameraFrames::getFirstComplete(void)
+{
+    DEB_MEMBER_FUNCT();
+
+    // protecting the containers access
+    lima::AutoMutex container_mutex = containersLock();
+
+    return m_complete_frames.front();
 }
 
 /************************************************************************
@@ -162,6 +178,13 @@ void CameraFrames::moveFirstCompleteToTreated()
 
     if(!m_complete_frames.empty())
     {
+        // first we free the internal image of the frame
+        {
+            CameraFrame & frame = m_complete_frames.front();
+            frame.clearImage();
+        }
+
+        // we move the frame to the treated frame container
         CameraFrame frame = m_complete_frames.front();
         m_complete_frames.pop_front();
         m_treated_frames.push_back(frame);
