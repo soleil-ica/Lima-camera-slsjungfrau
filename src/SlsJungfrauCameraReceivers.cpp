@@ -24,7 +24,7 @@
 /*! 
  *  \file   SlsJungfrauCameraReceivers.h
  *  \brief  SlsJungfrau detector acquisition receivers controller class implementation 
- *  \author Cédric Castel - SOLEIL (MEDIANE SYSTEME - IT consultant) 
+ *  \author Cedric Castel - SOLEIL (MEDIANE SYSTEME - IT consultant) 
 */
 /*************************************************************************************/
 

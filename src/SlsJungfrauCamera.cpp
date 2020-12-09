@@ -24,7 +24,7 @@
 /*! 
  *  \file   SlsJungfrauCamera.cpp
  *  \brief  SlsJungfrau detector hardware class implementation
- *  \author Cédric Castel - SOLEIL (MEDIANE SYSTEME - IT consultant) 
+ *  \author Cedric Castel - SOLEIL (MEDIANE SYSTEME - IT consultant) 
 */
 /*************************************************************************/
 
@@ -321,6 +321,8 @@ lima::AutoMutex Camera::calibrationLock() const
  *******************************************************************/
 void Camera::startCalibration()
 {
+    DEB_MEMBER_FUNCT();
+
     stopCalibration();
 
     m_dark_thread->sendCmd(CameraDarkThread::StartCalibration);
@@ -332,6 +334,8 @@ void Camera::startCalibration()
  *******************************************************************/
 void Camera::stopCalibration()
 {
+    DEB_MEMBER_FUNCT();
+
     // stopping the thread and restarting the thread in case of error
     applyStopCalibration(true, false);
 }
@@ -377,6 +381,8 @@ void Camera::startAcq()
  *******************************************************************/
 void Camera::stopAcq()
 {
+    DEB_MEMBER_FUNCT();
+
     // stopping the thread and restarting the thread in case of error
     applyStopAcq(true, false);
 }
@@ -580,6 +586,8 @@ void Camera::acquisitionDataReady(const int      in_receiver_index,
  ************************************************************************/
 int Camera::startReceiver()
 {
+    DEB_MEMBER_FUNCT();
+
     // protecting the sdk concurrent access
     lima::AutoMutex sdk_mutex = sdkLock(); 
 
@@ -592,6 +600,8 @@ int Camera::startReceiver()
  ************************************************************************/
 int Camera::stopReceiver()
 {
+    DEB_MEMBER_FUNCT();
+
     // protecting the sdk concurrent access
     lima::AutoMutex sdk_mutex = sdkLock(); 
 
@@ -604,6 +614,8 @@ int Camera::stopReceiver()
  ************************************************************************/
 int Camera::startAcquisition()
 {
+    DEB_MEMBER_FUNCT();
+
     // protecting the sdk concurrent access
     lima::AutoMutex sdk_mutex = sdkLock(); 
 
@@ -616,6 +628,8 @@ int Camera::startAcquisition()
  ************************************************************************/
 int Camera::stopAcquisition()
 {
+    DEB_MEMBER_FUNCT();
+
     // protecting the sdk concurrent access
     lima::AutoMutex sdk_mutex = sdkLock(); 
 
@@ -2012,6 +2026,8 @@ void Camera::getGainCoeffsState(int in_gain_index, double * out_gain_coeffs)
  *******************************************************************/
 void Camera::setCalibrationExposureTimeAndPeriod(double in_pedestal_exposures_sec, double in_pedestal_periods_sec)
 {
+    DEB_MEMBER_FUNCT();
+
     // protecting the concurrent access
     lima::AutoMutex sdk_mutex = calibrationLock(); 
 
@@ -2258,6 +2274,8 @@ bool Camera::saveDarkImageFile(const std::string & in_file_name,
  *******************************************************************/
 void Camera::resetDarkImageFile()
 {
+    DEB_MEMBER_FUNCT();
+
     // protecting the concurrent access
     lima::AutoMutex sdk_mutex = calibrationLock(); 
 
@@ -2275,6 +2293,8 @@ void Camera::resetDarkImageFile()
  *******************************************************************/
 void Camera::updateDarkImagesData()
 {
+    DEB_MEMBER_FUNCT();
+    
     // protecting the concurrent access
     lima::AutoMutex sdk_mutex = calibrationLock(); 
 
@@ -2371,6 +2391,8 @@ bool Camera::areIntensityCoeffsValid(void) const
  *******************************************************************/
 void Camera::resetIntensityCoeffs(void)
 {
+    DEB_MEMBER_FUNCT();
+    
     // protecting the concurrent access
     lima::AutoMutex sdk_mutex = calibrationLock(); 
 

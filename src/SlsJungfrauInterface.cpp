@@ -24,7 +24,7 @@
 /*! 
  *  \file   SlsJungfrauInterface.cpp
  *  \brief  SlsJungfrau hardware class implementation 
- *  \author Cédric Castel - SOLEIL (MEDIANE SYSTEME - IT consultant) 
+ *  \author Cedric Castel - SOLEIL (MEDIANE SYSTEME - IT consultant) 
 */
 /*************************************************************************/
 

@@ -24,7 +24,7 @@
 /*! 
  *  \file   SlsJungfrauCamera.h
  *  \brief  SlsJungfrau detector hardware class interface 
- *  \author Cédric Castel - SOLEIL (MEDIANE SYSTEME - IT consultant) 
+ *  \author Cedric Castel - SOLEIL (MEDIANE SYSTEME - IT consultant) 
 */
 /*************************************************************************/
 

@@ -22,7 +22,7 @@
 //
 // SlsJungfrauImageSize.h
 // Created on: August 05, 2020
-// Author: Cédric CASTEL
+// Author: Cedric Castel
 
 #ifndef SLSJUNGFRAUIMAGESIZE_H_
 #define SLSJUNGFRAUIMAGESIZE_H_

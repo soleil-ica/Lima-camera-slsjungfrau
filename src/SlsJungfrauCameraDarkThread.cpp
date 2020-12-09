@@ -24,7 +24,7 @@
 /*! 
  *  \file   SlsJungfrauCameraDarkThread.h
  *  \brief  SlsJungfrau detector dark images generator thread class implementation 
- *  \author Cédric Castel - SOLEIL (MEDIANE SYSTEME - IT consultant) 
+ *  \author Cedric Castel - SOLEIL (MEDIANE SYSTEME - IT consultant) 
 */
 /*************************************************************************/
 
@@ -445,6 +445,8 @@ bool CameraDarkThread::createDarkImage(int in_gain_index)
 void CameraDarkThread::accumulateImage(uint32_t *       out_acc_buffer ,
                                        const uint16_t * in_image_buffer)
 {
+    DEB_MEMBER_FUNCT();
+
     uint32_t nb = m_cam.m_width * m_cam.m_height;
 
     while(nb--)
@@ -465,6 +467,8 @@ void CameraDarkThread::averageImage(uint16_t *       out_image_buffer,
                                     const uint32_t * in_acc_buffer   ,
                                     long             in_acc_images_nb)
 {
+    DEB_MEMBER_FUNCT();
+    
     uint32_t nb = m_cam.m_width * m_cam.m_height;
 
     while(nb--)

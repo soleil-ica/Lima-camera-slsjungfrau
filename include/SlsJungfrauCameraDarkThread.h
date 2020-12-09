@@ -24,7 +24,7 @@
 /*! 
  *  \file   SlsJungfrauCameraDarkThread.h
  *  \brief  SlsJungfrau detector dark images generator thread class interface
- *  \author Cédric Castel - SOLEIL (MEDIANE SYSTEME - IT consultant) 
+ *  \author Cedric Castel - SOLEIL (MEDIANE SYSTEME - IT consultant) 
 */
 /*************************************************************************/
 

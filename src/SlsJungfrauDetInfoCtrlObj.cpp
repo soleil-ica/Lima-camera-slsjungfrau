@@ -24,7 +24,7 @@
 /*! 
  *  \file   SlsJungfrauDetInfoCtrlObj.h
  *  \brief  SlsJungfrau detector info class implementation 
- *  \author Cédric Castel - SOLEIL (MEDIANE SYSTEME - IT consultant) 
+ *  \author Cedric Castel - SOLEIL (MEDIANE SYSTEME - IT consultant) 
 */
 /*************************************************************************/
 

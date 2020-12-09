@@ -24,7 +24,7 @@
 /*! 
  *  \file   SlsJungfrauSyncCtrlObj.cpp
  *  \brief  SlsJungfrau synchronization class implementation 
- *  \author Cédric Castel - SOLEIL (MEDIANE SYSTEME - IT consultant) 
+ *  \author Cedric Castel - SOLEIL (MEDIANE SYSTEME - IT consultant) 
 */
 /*************************************************************************/
 

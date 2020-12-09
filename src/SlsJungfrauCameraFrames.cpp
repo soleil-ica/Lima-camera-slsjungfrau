@@ -24,7 +24,7 @@
 /*! 
  *  \file   SlsJungfrauCameraFrames.h
  *  \brief  SlsJungfrau detector frames manager class implementation 
- *  \author Cédric Castel - SOLEIL (MEDIANE SYSTEME - IT consultant) 
+ *  \author Cedric Castel - SOLEIL (MEDIANE SYSTEME - IT consultant) 
 */
 /*************************************************************************************/
 
@@ -284,6 +284,8 @@ void CameraFrames::clear()
 void CameraFrames::manageFirstFrameTreatment(const uint64_t in_absolute_frame_index,
                                              const uint64_t in_absolute_timestamp  )
 {
+    DEB_MEMBER_FUNCT();
+    
     if(!m_is_first_frame_received)
     {
         m_first_frame_index       = in_absolute_frame_index;

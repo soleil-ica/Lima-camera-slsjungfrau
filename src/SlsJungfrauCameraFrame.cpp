@@ -24,7 +24,7 @@
 /*! 
  *  \file   SlsJungfrauCameraFrame.h
  *  \brief  SlsJungfrau detector frame class implementation 
- *  \author Cédric Castel - SOLEIL (MEDIANE SYSTEME - IT consultant) 
+ *  \author Cedric Castel - SOLEIL (MEDIANE SYSTEME - IT consultant) 
 */
 /*************************************************************************************/
 

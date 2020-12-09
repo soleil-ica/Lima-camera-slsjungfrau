@@ -24,7 +24,7 @@
 /*! 
  *  \file   SlsJungfrauCameraThread.h
  *  \brief  SlsJungfrau detector acquisition thread class implementation 
- *  \author Cédric Castel - SOLEIL (MEDIANE SYSTEME - IT consultant) 
+ *  \author Cedric Castel - SOLEIL (MEDIANE SYSTEME - IT consultant) 
 */
 /*************************************************************************/
 
