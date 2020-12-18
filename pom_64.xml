@@ -10,7 +10,7 @@
 
     <groupId>fr.soleil.lib.Lima.Camera</groupId>
     <artifactId>LimaSlsJungfrau-amd64-Linux-gcc-shared-${mode}</artifactId>
-    <version>1.1.0</version>
+    <version>1.2.0</version>
 
     <packaging>nar</packaging>
     <name>LimaSlsJungfrau</name>
