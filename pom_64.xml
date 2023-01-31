@@ -10,7 +10,7 @@
 
     <groupId>fr.soleil.lib.Lima.Camera</groupId>
     <artifactId>LimaSlsJungfrau-amd64-Linux-gcc-shared-${mode}</artifactId>
-    <version>1.2.1</version>
+    <version>1.2.2</version>
 
     <packaging>nar</packaging>
     <name>LimaSlsJungfrau</name>
@@ -31,7 +31,7 @@
         <dependency>
             <groupId>fr.soleil.lib</groupId>
 			<artifactId>LimaCore-amd64-Linux-gcc-shared-${mode}</artifactId>
-            <version>1.7.10</version>
+            <version>1.7.11</version>
         </dependency>
     </dependencies>
 
